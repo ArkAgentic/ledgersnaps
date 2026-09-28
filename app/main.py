@@ -1,0 +1,1003 @@
+from io import BytesIO
+import os
+from pathlib import Path
+from typing import Literal
+from typing import Optional
+from typing import cast
+
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi.security import HTTPAuthorizationCredentials
+from fastapi.responses import HTMLResponse, Response
+
+from .abn import abr_lookup_by_name, compliance_warnings_for_abn, lookup_abn_context
+from .auth import CurrentUser, bearer_scheme, issue_dev_token, resolve_current_user
+from .billing import PLAN_CATALOG, account_snapshot, can_consume, consume_invoices, set_plan
+from .config import settings
+from .exporter import build_multifile_extraction_workbook
+from .flow import classify_document_flow
+from .llm import parse_invoice_with_azure_openai
+from .myob_mapper import to_myob_draft_bill
+from .queue_backend import QueueBackend, QueueMessage
+from .rules import extract_invoice_rules
+from .schemas import (
+    BatchExtractAndMapResponse,
+    ExtractAndMapChunkResult,
+    ExtractionMeta,
+    ExtractAndMapResponse,
+    ExtractResponse,
+    InvoiceData,
+    MultiFileBatchItem,
+    MultiFileBatchResponse,
+    UsageCost,
+)
+from .splitter import split_pdf_auto
+from .store import create_job, get_job_owned, get_job_result_owned, list_jobs_owned, set_job_status_owned, upsert_job_result_owned
+from .store import list_queue_counts
+from .validators import validate_pdf_bytes
+from .xero_mapper import to_xero_accpay_draft
+from .xero_payload_validator import validate_xero_draft_payload
+
+app = FastAPI(title="LedgerSnaps API", version="0.4.1")
+queue_backend = QueueBackend(settings.queue_backend)
+
+
+def _current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    x_user_id: Optional[str] = Header(default=None, alias="X-User-Id"),
+    dev_token: Optional[str] = Header(default=None, alias="X-Dev-Token"),
+) -> CurrentUser:
+    return resolve_current_user(credentials, x_user_id, dev_token)
+
+
+def _normalize_upload_inputs(files: Optional[list[UploadFile]], file: Optional[UploadFile]) -> list[UploadFile]:
+    """统一入口：优先使用 files，兼容旧前端传 file。"""
+    if files and len(files) > 0:
+        return files
+    if file is not None:
+        return [file]
+    raise HTTPException(status_code=422, detail="missing upload: provide files[] (preferred) or file")
+
+
+def _raise_invoice_limit_exceeded(estimated: int, max_invoices: int = 20) -> None:
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"invoice_count_exceeded: estimated={estimated}, limit={max_invoices}. "
+            f"Please upload at most {max_invoices} invoices/bills per run."
+        ),
+    )
+
+
+def _estimate_invoices_from_upload(filename: str, content_type: str, file_bytes: bytes) -> int:
+    """提取前的快速发票数估计：图片=1；PDF 用 max(split chunk, page count)。"""
+    name = (filename or "").lower()
+    if content_type.startswith("image/"):
+        return 1
+    if name.endswith(".pdf"):
+        split_count = 1
+        page_count = 1
+        try:
+            chunks, _, _ = split_pdf_auto(file_bytes)
+            split_count = max(1, len(chunks))
+        except Exception:
+            pass
+        try:
+            from pypdf import PdfReader
+
+            page_count = max(1, len(PdfReader(BytesIO(file_bytes)).pages))
+        except Exception:
+            pass
+        return max(split_count, page_count)
+    return 1
+
+
+def _validate_upload(file_bytes: bytes, filename: str, content_type: str) -> None:
+    """L0: 上传预检（格式、大小、页数）。"""
+    suffix = Path(filename).suffix.lower()
+    max_bytes = settings.max_file_mb * 1024 * 1024
+    if len(file_bytes) > max_bytes:
+        raise HTTPException(status_code=400, detail=f"File exceeds size limit of {settings.max_file_mb}MB")
+
+    if suffix == ".pdf":
+        try:
+            validate_pdf_bytes(file_bytes, max_pages=settings.max_pdf_pages, max_mb=settings.max_file_mb)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    elif not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files or PDF are supported")
+
+
+def _apply_flow(invoice: InvoiceData, override: Literal["auto", "ap", "ar"]) -> InvoiceData:
+    """
+    L0/L4: 文档流向（AP/AR）决策。
+    - auto: 系统自动分类
+    - ap/ar: 用户强制覆盖
+    """
+    if override == "ap":
+        invoice.document_flow = "ap"
+        invoice.flow_confidence = 1.0
+        invoice.flow_reasons = ["user_override"]
+        invoice.flow_overridden_by_user = True
+        return invoice
+    if override == "ar":
+        invoice.document_flow = "ar"
+        invoice.flow_confidence = 1.0
+        invoice.flow_reasons = ["user_override"]
+        invoice.flow_overridden_by_user = True
+        return invoice
+
+    flow, conf, reasons = classify_document_flow(invoice)
+    invoice.document_flow = flow
+    invoice.flow_confidence = conf
+    invoice.flow_reasons = reasons
+    invoice.flow_overridden_by_user = False
+    return invoice
+
+
+def _is_tax_invoice_like(invoice: InvoiceData, filename: str) -> bool:
+    """文档类型粗判：用于识别 quote/proforma/statement 风险。"""
+    text = " ".join(
+        [
+            (invoice.reference or ""),
+            (invoice.invoice_num or ""),
+            (invoice.supplier_invoice_number or ""),
+            filename,
+        ]
+    ).lower()
+    bad_hints = ["quote", "proforma", "statement"]
+    if any(h in text for h in bad_hints):
+        return False
+    return True
+
+
+def _build_validation_warnings(target: Literal["xero", "myob"], invoice: InvoiceData) -> list[str]:
+    """L3: 映射前校验（按目标系统必填字段 + 金额一致性）。"""
+    warnings: list[str] = []
+
+    # AP / AR 核心必填（与系统要求对齐）
+    if invoice.document_flow == "ap":
+        if not invoice.vendor_name:
+            warnings.append(f"{target}: missing supplier/contact name (AP compulsory)")
+        if not invoice.date:
+            warnings.append(f"{target}: missing bill/invoice date (AP compulsory)")
+        if not invoice.line_items and invoice.total is None:
+            warnings.append(f"{target}: missing line items and total (AP compulsory)")
+    elif invoice.document_flow == "ar":
+        if not invoice.vendor_name:
+            warnings.append(f"{target}: missing customer/contact name (AR compulsory)")
+        if not invoice.date:
+            warnings.append(f"{target}: missing invoice date (AR compulsory)")
+        if not invoice.line_items and invoice.total is None:
+            warnings.append(f"{target}: missing line items and total (AR compulsory)")
+
+    # accounting consistency warnings
+    if invoice.subtotal is not None and invoice.gst is not None and invoice.total is not None:
+        expected = round(invoice.subtotal + invoice.gst, 2)
+        if abs(expected - round(invoice.total, 2)) > 0.05:
+            warnings.append(
+                f"amount mismatch: subtotal({invoice.subtotal}) + gst({invoice.gst}) != total({invoice.total})"
+            )
+
+    return warnings
+
+
+@app.get("/", response_class=HTMLResponse)
+async def playground() -> HTMLResponse:
+    html = """
+<!doctype html><html><body style='font-family:system-ui;max-width:860px;margin:24px auto;padding:0 12px;'>
+<h2>LedgerSnaps Phase-1 Extract Test</h2>
+<div style='margin:6px 0;color:#888;font-size:12px;'>build=auth-ui-v3</div>
+<p>Upload invoices/bills and run unified batch extract+map.</p>
+<div id='auth' style='margin:8px 0;color:#222;'>Not logged in</div>
+<button id='loginA' onclick="loginAs('client-a'); return false;">Login as client A</button>
+<button id='loginB' onclick="loginAs('client-b'); return false;">Login as client B</button>
+<div id='debug' style='margin:8px 0;color:#666;font-size:12px;white-space:pre-wrap;'></div>
+<input id='file' type='file' accept='image/*,.pdf' multiple />
+<select id='target'><option value='xero'>xero</option><option value='myob'>myob</option></select>
+<select id='flow'><option value='auto'>auto-flow</option><option value='ap'>force-ap</option><option value='ar'>force-ar</option></select>
+<button id='runBatch'>Extract+Map Batch</button>
+<button id='runExport'>Export XLSX</button>
+<div id='selected' style='margin-top:8px;color:#333;'></div>
+<div id='billing' style='margin-top:8px;color:#555;'></div>
+<pre id='out' style='white-space:pre-wrap;border:1px solid #ddd;padding:12px;min-height:180px'></pre>
+<script>
+var out=document.getElementById('out');
+var billing=document.getElementById('billing');
+var selected=document.getElementById('selected');
+var fileInput=document.getElementById('file');
+var auth=document.getElementById('auth');
+var debug=document.getElementById('debug');
+var authToken='';
+var authUser='';
+auth.textContent='Script loaded, waiting login...';
+
+function logDebug(msg){
+  if(!debug){ return; }
+  var now = new Date().toLocaleTimeString();
+  debug.textContent = '['+now+'] '+msg+'\\n' + (debug.textContent || '');
+}
+
+async function loginAs(userId, tenantId='default'){
+  logDebug('loginAs called: '+userId+' tenant='+tenantId);
+  const r = await fetch(`/api/v1/auth/dev-token?user_id=${encodeURIComponent(userId)}&tenant_id=${encodeURIComponent(tenantId)}`);
+  logDebug('token endpoint status='+r.status);
+  if(!r.ok){
+    auth.textContent='Login failed';
+    logDebug('login failed');
+    return;
+  }
+  const j=await r.json();
+  authToken=j.token;
+  authUser=j.user_id;
+  try { localStorage.setItem('ledgersnaps_dev_token', authToken); localStorage.setItem('ledgersnaps_user', authUser); } catch(e) {}
+  try { document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(authToken)+'; path=/; max-age='+(24*3600)+'; samesite=lax'; } catch(e) {}
+  auth.textContent=`Logged in as ${authUser}`;
+  logDebug('login ok as '+authUser);
+}
+
+async function refreshAuthFromCookieOrStorage(){
+  try{
+    var me = await fetch('/api/v1/auth/me', {headers:{'X-Dev-Token': authToken}, credentials:'same-origin'});
+    if(me.ok){
+      var m = await me.json();
+      authUser = m.user_id || authUser;
+      auth.textContent='Logged in as '+authUser;
+      logDebug('auth/me ok source='+m.source+' user='+authUser);
+      return true;
+    }
+  }catch(e){
+    logDebug('auth/me request error');
+  }
+  try{
+    var t = localStorage.getItem('ledgersnaps_dev_token') || '';
+    var u = localStorage.getItem('ledgersnaps_user') || '';
+    if(t){
+      authToken=t;
+      authUser=u || authUser;
+      var me2 = await fetch('/api/v1/auth/me', {headers:{'X-Dev-Token': authToken}, credentials:'same-origin'});
+      if(me2.ok){
+        var m2 = await me2.json();
+        authUser = m2.user_id || authUser;
+      }
+      auth.textContent='Logged in as '+(authUser || 'cached-user');
+      logDebug('restored token from localStorage');
+      return true;
+    }
+  }catch(e){
+    logDebug('localStorage unavailable');
+  }
+  return false;
+}
+
+document.getElementById('loginA').addEventListener('click', function(){ logDebug('click loginA'); });
+document.getElementById('loginB').addEventListener('click', function(){ logDebug('click loginB'); });
+function renderSelected(){
+  const files=[...fileInput.files];
+  if(files.length===0){ selected.textContent='Selected files: 0'; return; }
+  selected.textContent=`Selected files: ${files.length} -> ${files.map(f=>f.name).join(', ')}`;
+}
+fileInput.addEventListener('change', renderSelected);
+renderSelected();
+function costLine(meta){
+  if(!meta||!meta.usage) return 'cost: n/a';
+  return `cost_estimate_usd=${meta.usage.estimated_cost_usd} (in=${meta.usage.input_tokens}, out=${meta.usage.output_tokens})`;
+}
+async function run(path){
+  var files=Array.prototype.slice.call(document.getElementById('file').files || []);
+  if(files.length===0){out.textContent='Please choose file(s)';return;}
+  out.textContent=`Submitting ${files.length} file(s)...`;
+  var fd=new FormData();
+  if(path.includes('/batch/multi') || path.includes('/unified/export.xlsx') || path.includes('/extract-and-map/export.xlsx')){
+    for(var i=0;i<files.length;i++){ fd.append('files', files[i]); }
+  }else{
+    fd.append('file', files[0]);
+  }
+  var target=document.getElementById('target').value;
+  var flow=document.getElementById('flow').value;
+  var q=path.indexOf('extract-and-map')>=0?('?target='+encodeURIComponent(target)+'&flow_mode='+encodeURIComponent(flow)):'';
+  if(!authToken){
+    out.textContent='Please login first (client A/client B)';
+    return;
+  }
+  let r;
+  try{
+    r=await fetch(path+q,{method:'POST',body:fd,headers:{'Authorization':`Bearer ${authToken}`,'X-Client-File-Count':String(files.length)}});
+  }catch(err){
+    out.textContent='Network error: '+String(err);
+    return;
+  }
+
+  if(path.includes('export.xlsx')){
+    if(!r.ok){
+      const j=await r.json();
+      out.textContent=JSON.stringify({status:r.status,...j},null,2);
+      return;
+    }
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var many = files.length > 1;
+    a.download = many ? `batch-extraction-${files.length}-files.xlsx` : (files[0].name.replace(/\.[^.]+$/, '') || 'invoice') + '-extraction.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+    var received = r.headers.get('X-Received-Files');
+    out.textContent = 'xlsx exported: '+a.download+' | selected='+files.length+' | received='+(received ? received : 'n/a');
+    return;
+  }
+
+  var j;
+  try{
+    j=await r.json();
+  }catch(err){
+    out.textContent='Response parse error (non-JSON): status='+r.status;
+    return;
+  }
+  out.textContent = costLine(j.meta) + '\\n\\n' + JSON.stringify({status:r.status,...j},null,2);
+  try {
+    const b = await fetch('/api/v1/billing/me', {headers:{'Authorization':`Bearer ${authToken}`}}).then(x=>x.json());
+    const a = b.account;
+    billing.textContent = `User=${authUser} | Plan=${a.plan_id} | Remaining invoices=${a.remaining_invoices}/${a.invoice_limit}`;
+  } catch (e) {}
+}
+document.getElementById('runBatch').onclick=function(){ run('/api/v1/extract-and-map/batch/multi'); };
+document.getElementById('runExport').onclick=function(){ run('/api/v1/extract-and-map/unified/export.xlsx'); };
+// 页面初始化
+auth.textContent='Initializing...';
+window.addEventListener('load', async function(){
+  logDebug('window load');
+  var ok = await refreshAuthFromCookieOrStorage();
+  if(!ok){
+    loginAs('client-a');
+  }
+});
+</script></body></html>
+"""
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
+@app.get("/health")
+async def health() -> dict:
+    endpoint_ok = bool(os.getenv("AZURE_OPENAI_ENDPOINT", "").strip())
+    key_ok = bool(os.getenv("AZURE_OPENAI_API_KEY", "").strip())
+    deployment_ok = bool(os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip())
+    abr_guid_ok = bool(os.getenv("ABR_GUID", "").strip())
+    aoai_configured = endpoint_ok and key_ok and deployment_ok
+
+    return {
+        "status": "ok",
+        "checks": {
+            "aoai_configured": aoai_configured,
+            "aoai": {
+                "endpoint": endpoint_ok,
+                "api_key": key_ok,
+                "deployment": deployment_ok,
+            },
+            "abr_guid_configured": abr_guid_ok,
+        },
+    }
+
+
+@app.post("/api/v1/extract", response_model=ExtractResponse)
+async def extract_invoice(file: UploadFile = File(...)) -> ExtractResponse:
+    filename = file.filename or "upload"
+    content_type = (file.content_type or "").lower()
+    file_bytes = await file.read()
+
+    _validate_upload(file_bytes, filename, content_type)
+
+    rules_invoice, rules_warnings, rules_confident = extract_invoice_rules(file_bytes=file_bytes, filename=filename, content_type=content_type)
+    if rules_confident:
+        return ExtractResponse(
+            invoice=rules_invoice,
+            model="rules",
+            meta=ExtractionMeta(
+                method="rules",
+                usage=UsageCost(),
+                warnings=rules_warnings,
+                trace=["L0 upload validated", "L1 StepA rules extracted", "L1 quality gate passed", "L2 LLM skipped"],
+            ),
+        )
+
+    try:
+        invoice, usage = await parse_invoice_with_azure_openai(file_bytes=file_bytes, filename=filename, content_type=content_type)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    return ExtractResponse(
+        invoice=invoice,
+        model="gpt-4o",
+        meta=ExtractionMeta(
+            method="llm",
+            usage=usage,
+            warnings=rules_warnings,
+            trace=["L0 upload validated", "L1 StepA rules extracted", "L1 quality gate failed", "L2 LLM extraction executed"],
+        ),
+    )
+
+
+async def _extract_and_map_core(
+    target: Literal["xero", "myob"],
+    flow_mode: Literal["auto", "ap", "ar"],
+    file: UploadFile,
+) -> ExtractAndMapResponse:
+    filename = file.filename or "upload"
+    content_type = (file.content_type or "").lower()
+    file_bytes = await file.read()
+    return await _extract_and_map_from_bytes(
+        target=target,
+        flow_mode=flow_mode,
+        filename=filename,
+        content_type=content_type,
+        file_bytes=file_bytes,
+    )
+
+
+async def _extract_and_map_from_bytes(
+    target: Literal["xero", "myob"],
+    flow_mode: Literal["auto", "ap", "ar"],
+    filename: str,
+    content_type: str,
+    file_bytes: bytes,
+) -> ExtractAndMapResponse:
+    _validate_upload(file_bytes, filename, content_type)
+
+    split_chunks = [file_bytes]
+    split_decision = "single"
+    split_stats = {}
+    if filename.lower().endswith(".pdf"):
+        split_chunks, split_decision, split_stats = split_pdf_auto(file_bytes)
+
+    if len(split_chunks) > 1:
+        trace_prefix = [
+            f"L0 split(auto) decision={split_decision}",
+            f"L0 split(auto) chunks={len(split_chunks)} stats={split_stats}",
+        ]
+        file_bytes = split_chunks[0]
+    else:
+        trace_prefix = [f"L0 split(auto) decision={split_decision} stats={split_stats}"]
+
+    if content_type.startswith("image/"):
+        warnings: list[str] = []
+        try:
+            invoice, usage = await parse_invoice_with_azure_openai(file_bytes=file_bytes, filename=filename, content_type=content_type)
+        except RuntimeError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+        model = "gpt-4o"
+        method = "llm"
+        trace = ["L0 upload validated", *trace_prefix, "L1 StepA rules skipped for image", "L2 LLM extraction executed"]
+    else:
+        rules_invoice, rules_warnings, rules_confident = extract_invoice_rules(
+            file_bytes=file_bytes,
+            filename=filename,
+            content_type=content_type,
+        )
+        if rules_confident:
+            invoice = rules_invoice
+            model = "rules"
+            usage = UsageCost()
+            method = "rules"
+            warnings = rules_warnings
+            trace = ["L0 upload validated", *trace_prefix, "L1 StepA rules extracted", "L1 quality gate passed", "L2 LLM skipped"]
+        else:
+            try:
+                invoice, usage = await parse_invoice_with_azure_openai(file_bytes=file_bytes, filename=filename, content_type=content_type)
+            except RuntimeError as e:
+                raise HTTPException(status_code=502, detail=str(e)) from e
+            model = "gpt-4o"
+            method = "llm"
+            warnings = rules_warnings
+            trace = ["L0 upload validated", *trace_prefix, "L1 StepA rules extracted", "L1 quality gate failed", "L2 LLM extraction executed"]
+
+    invoice = _apply_flow(invoice, flow_mode)
+    if invoice.document_flow == "ar" and target == "myob":
+        warnings.append("classified as AR; current MYOB mapper still uses AP-bill payload shape")
+
+    draft_payload = to_xero_accpay_draft(invoice).model_dump() if target == "xero" else to_myob_draft_bill(invoice).model_dump()
+
+    xero_ready = None
+    missing_required_fields: list[str] = []
+    suggested_fixes: list[str] = []
+    if target == "xero":
+        xero_ready, missing_required_fields, suggested_fixes = validate_xero_draft_payload(draft_payload)
+
+    validation_warnings = warnings + _build_validation_warnings(target, invoice)
+    abr_context = await lookup_abn_context(invoice.abn, invoice.vendor_name)
+    is_tax_invoice_like = _is_tax_invoice_like(invoice, filename)
+
+    if not abr_context.get("available"):
+        validation_warnings.append(
+            "compliance: ABR real-time check pending (ABR_GUID not configured); GST registration validation is provisional"
+        )
+
+    if invoice.gst is not None and invoice.gst_source == "none":
+        invoice.gst_extracted = invoice.gst
+        invoice.gst_source = "extracted"
+        invoice.gst_confidence = max(invoice.gst_confidence, 0.8)
+
+    if invoice.gst is None:
+        invoice.gst_extracted = None
+        invoice.gst_inferred = None
+        invoice.gst_source = "none"
+        invoice.gst_confidence = 0.0
+        validation_warnings.append(
+            "compliance: GST not explicitly extracted from document; pending ABR/GST-registration-assisted validation"
+        )
+
+    validation_warnings.extend(
+        compliance_warnings_for_abn(
+            abn_raw=invoice.abn,
+            gst_present=invoice.gst is not None,
+            total=invoice.total,
+            is_tax_invoice_like=is_tax_invoice_like,
+            abr_context={**abr_context, "vendor_name": invoice.vendor_name},
+            vendor_name=invoice.vendor_name,
+        )
+    )
+
+    if invoice.document_flow == "unknown":
+        validation_warnings.append("flow classification is unknown; user confirmation required before posting")
+
+    return ExtractAndMapResponse(
+        invoice=invoice,
+        target=target,
+        draft_payload=draft_payload,
+        xero_ready=xero_ready,
+        missing_required_fields=missing_required_fields,
+        suggested_fixes=suggested_fixes,
+        validation_warnings=validation_warnings,
+        model=model,
+        meta=ExtractionMeta(method=method, usage=usage, warnings=validation_warnings, trace=trace),
+    )
+
+
+async def _extract_and_map_batch_core(
+    target: Literal["xero", "myob"],
+    flow_mode: Literal["auto", "ap", "ar"],
+    filename: str,
+    content_type: str,
+    file_bytes: bytes,
+    user_id: str,
+) -> BatchExtractAndMapResponse:
+    # 图片天然按单文档处理，避免混合上传时被 PDF split 流程吞掉
+    if content_type.startswith("image/"):
+        if not can_consume(user_id, 1):
+            return BatchExtractAndMapResponse(
+                split_decision="single",
+                chunk_count=1,
+                chunks=[],
+                summary={"ok": 0, "failed": 1, "split_stats": {}, "billable_invoice_count": 0},
+            )
+        result = await _extract_and_map_from_bytes(
+            target=target,
+            flow_mode=flow_mode,
+            filename=filename,
+            content_type=content_type,
+            file_bytes=file_bytes,
+        )
+        result.meta.trace = [
+            "L0 split(batch) decision=single stats={}",
+            "L0 split(batch) chunk_index=1/1",
+            *result.meta.trace,
+        ]
+        consume_invoices(user_id, 1)
+        return BatchExtractAndMapResponse(
+            split_decision="single",
+            chunk_count=1,
+            chunks=[ExtractAndMapChunkResult(chunk_index=1, result=result)],
+            summary={"ok": 1, "failed": 0, "split_stats": {}, "billable_invoice_count": 1},
+        )
+
+    split_chunks = [file_bytes]
+    split_decision: Literal["single", "split"] = "single"
+    split_stats = {}
+    if filename.lower().endswith(".pdf"):
+        split_chunks, split_decision_raw, split_stats = split_pdf_auto(file_bytes)
+        split_decision = cast(Literal["single", "split"], split_decision_raw)
+
+    chunks: list[ExtractAndMapChunkResult] = []
+    ok = 0
+    failed = 0
+    for i, chunk_bytes in enumerate(split_chunks, start=1):
+        if not can_consume(user_id, 1):
+            failed += (len(split_chunks) - i + 1)
+            break
+        uf = UploadFile(filename=f"{Path(filename).stem}__chunk{i}.pdf", file=BytesIO(chunk_bytes), headers=None)
+        try:
+            result = await _extract_and_map_core(target=target, flow_mode=flow_mode, file=uf)
+            # 统一把 batch 拆分判定写入每个 chunk trace
+            result.meta.trace = [
+                f"L0 split(batch) decision={split_decision} stats={split_stats}",
+                f"L0 split(batch) chunk_index={i}/{len(split_chunks)}",
+                *result.meta.trace,
+            ]
+            chunks.append(ExtractAndMapChunkResult(chunk_index=i, result=result))
+            ok += 1
+            consume_invoices(user_id, 1)
+        except Exception:  # noqa: BLE001
+            failed += 1
+
+    return BatchExtractAndMapResponse(
+        split_decision=split_decision,
+        chunk_count=len(split_chunks),
+        chunks=chunks,
+        summary={
+            "ok": ok,
+            "failed": failed,
+            "split_stats": split_stats,
+            "billable_invoice_count": ok,
+        },
+    )
+
+
+@app.get("/api/v1/auth/dev-token")
+async def auth_dev_token(
+    user_id: str = Query(..., min_length=1),
+    tenant_id: str = Query("default", min_length=1),
+) -> Response:
+    token = issue_dev_token(user_id=user_id, tenant_id=tenant_id)
+    body = {"token": token, "token_type": "bearer", "user_id": user_id, "tenant_id": tenant_id}
+    resp = Response(
+        content=__import__("json").dumps(body),
+        media_type="application/json",
+    )
+    resp.set_cookie(
+        key="ledgersnaps_dev_token",
+        value=token,
+        httponly=False,
+        samesite="lax",
+        secure=False,
+        max_age=24 * 3600,
+        path="/",
+    )
+    return resp
+
+
+@app.get("/api/v1/billing/me")
+async def billing_me(user: CurrentUser = Depends(_current_user)) -> dict:
+    return {
+        "plans": PLAN_CATALOG,
+        "account": account_snapshot(user.user_id),
+        "auth": {"user_id": user.user_id, "tenant_id": user.tenant_id, "source": user.auth_source},
+    }
+
+
+@app.get("/api/v1/auth/me")
+async def auth_me(user: CurrentUser = Depends(_current_user)) -> dict:
+    return {"user_id": user.user_id, "tenant_id": user.tenant_id, "source": user.auth_source}
+
+
+@app.post("/api/v1/billing/plan")
+async def billing_set_plan(
+    plan_id: str = Query(...),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    try:
+        set_plan(user.user_id, plan_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"account": account_snapshot(user.user_id)}
+
+
+@app.post("/api/v1/compliance/abn-lookup")
+async def compliance_abn_lookup(name: str = Query(..., min_length=2)) -> dict:
+    """按公司名实时查询 ABR 候选（用于 Step A 补全 ABN）。"""
+    result = await abr_lookup_by_name(name)
+    return result
+
+
+@app.post("/api/v1/jobs")
+async def jobs_create(
+    file_count: int = Query(0, ge=0),
+    invoice_estimated: int = Query(0, ge=0),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    if invoice_estimated > settings.max_invoices_per_job:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"invoice_count_exceeded: estimated={invoice_estimated}, "
+                f"limit={settings.max_invoices_per_job}."
+            ),
+        )
+    job = create_job(
+        tenant_id=user.tenant_id,
+        user_id=user.user_id,
+        file_count=file_count,
+        invoice_estimated=invoice_estimated,
+    )
+    queue_backend.enqueue(
+        QueueMessage(
+            job_id=job["job_id"],
+            tenant_id=user.tenant_id,
+            user_id=user.user_id,
+            payload={"target": "xero", "flow_mode": "auto", "source": "jobs_create"},
+        )
+    )
+    return {"job": job}
+
+
+@app.get("/api/v1/jobs")
+async def jobs_list(user: CurrentUser = Depends(_current_user)) -> dict:
+    jobs = list_jobs_owned(tenant_id=user.tenant_id, user_id=user.user_id)
+    return {"jobs": jobs, "count": len(jobs)}
+
+
+@app.get("/api/v1/jobs/{job_id}")
+async def jobs_get(job_id: str, user: CurrentUser = Depends(_current_user)) -> dict:
+    job = get_job_owned(tenant_id=user.tenant_id, user_id=user.user_id, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="job_not_found")
+    return {"job": job}
+
+
+@app.get("/api/v1/jobs/{job_id}/result")
+async def jobs_result_get(job_id: str, user: CurrentUser = Depends(_current_user)) -> dict:
+    row = get_job_result_owned(tenant_id=user.tenant_id, user_id=user.user_id, job_id=job_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="job_result_not_found")
+    return {"job_result": row}
+
+
+@app.get("/api/v1/queue/stats")
+async def queue_stats(user: CurrentUser = Depends(_current_user)) -> dict:
+    # owner token required; current stats is global aggregate for operators
+    _ = user
+    return {"queue": list_queue_counts()}
+
+
+@app.post("/api/v1/extract-and-map", response_model=ExtractAndMapResponse)
+async def extract_and_map_invoice(
+    target: Literal["xero", "myob"] = Query(...),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    files: Optional[list[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
+) -> ExtractAndMapResponse:
+    uploads = _normalize_upload_inputs(files, file)
+    return await _extract_and_map_core(target=target, flow_mode=flow_mode, file=uploads[0])
+
+
+@app.post("/api/v1/extract-and-map/batch", response_model=MultiFileBatchResponse)
+async def extract_and_map_invoice_batch(
+    target: Literal["xero", "myob"] = Query(...),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    files: Optional[list[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
+    user: CurrentUser = Depends(_current_user),
+) -> MultiFileBatchResponse:
+    uploads = _normalize_upload_inputs(files, file)
+    if len(uploads) == 1:
+        f = uploads[0]
+        filename = f.filename or "upload"
+        content_type = (f.content_type or "").lower()
+        file_bytes = await f.read()
+        # batch 入口对超页 PDF 放宽限制，由 split(auto) 处理
+        suffix = Path(filename).suffix.lower()
+        max_bytes = settings.max_file_mb * 1024 * 1024
+        if len(file_bytes) > max_bytes:
+            raise HTTPException(status_code=400, detail=f"File exceeds size limit of {settings.max_file_mb}MB")
+        if suffix != ".pdf" and not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image files or PDF are supported")
+        br = await _extract_and_map_batch_core(
+            target=target,
+            flow_mode=flow_mode,
+            filename=filename,
+            content_type=content_type,
+            file_bytes=file_bytes,
+            user_id=user.user_id,
+        )
+        return MultiFileBatchResponse(
+            file_count=1,
+            items=[MultiFileBatchItem(file_name=filename, ok=True, batch_result=br)],
+            summary={
+                "ok_files": 1,
+                "failed_files": 0,
+                "total_chunks": br.chunk_count,
+                "max_batch_files": settings.max_batch_files,
+                "max_batch_total_mb": settings.max_batch_total_mb,
+                "account": account_snapshot(user.user_id),
+                "auth_user_id": user.user_id,
+            },
+        )
+
+    # n-file 统一入口（n<20）
+    return await extract_and_map_invoice_batch_multi(
+        target=target,
+        flow_mode=flow_mode,
+        files=uploads,
+        user=user,
+        client_file_count=len(uploads),
+    )
+
+
+@app.post("/api/v1/extract-and-map/batch/multi", response_model=MultiFileBatchResponse)
+async def extract_and_map_invoice_batch_multi(
+    target: Literal["xero", "myob"] = Query(...),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    files: list[UploadFile] = File(...),
+    user: CurrentUser = Depends(_current_user),
+    job_id: Optional[str] = None,
+    client_file_count: Optional[int] = Header(default=None, alias="X-Client-File-Count"),
+) -> MultiFileBatchResponse:
+    if job_id:
+        owned = get_job_owned(tenant_id=user.tenant_id, user_id=user.user_id, job_id=job_id)
+        if not owned:
+            raise HTTPException(status_code=404, detail="job_not_found")
+        set_job_status_owned(user.tenant_id, user.user_id, job_id, "running")
+
+    uploads = _normalize_upload_inputs(files, None)
+    # 先读取一次用于“提取前 invoice 数量预估”与后续处理复用
+    prepared: list[tuple[UploadFile, str, str, bytes]] = []
+    estimated_total = 0
+    total_bytes = 0
+    for f in uploads:
+        filename = f.filename or "upload"
+        content_type = (f.content_type or "").lower()
+        file_bytes = await f.read()
+        prepared.append((f, filename, content_type, file_bytes))
+
+        total_bytes += len(file_bytes)
+        if total_bytes > settings.max_batch_total_mb * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"total_size_exceeded: max {settings.max_batch_total_mb}MB")
+
+        estimated_total += _estimate_invoices_from_upload(filename, content_type, file_bytes)
+        if estimated_total > settings.max_invoices_per_job:
+            _raise_invoice_limit_exceeded(estimated_total, max_invoices=settings.max_invoices_per_job)
+
+    if client_file_count is not None and client_file_count != len(uploads):
+        raise HTTPException(
+            status_code=400,
+            detail=f"count_mismatch: client={client_file_count}, server={len(uploads)}",
+        )
+
+    if len(uploads) > settings.max_batch_files:
+        raise HTTPException(status_code=400, detail=f"too_many_files: max {settings.max_batch_files}")
+
+    items: list[MultiFileBatchItem] = []
+    ok = 0
+    failed = 0
+    total_chunks = 0
+
+    for f, filename, content_type, file_bytes in prepared:
+
+        try:
+            # 单文件大小限制与类型限制
+            suffix = Path(filename).suffix.lower()
+            if len(file_bytes) > settings.max_file_mb * 1024 * 1024:
+                raise ValueError(f"file exceeds {settings.max_file_mb}MB")
+            if suffix != ".pdf" and not content_type.startswith("image/"):
+                raise ValueError("Only image files or PDF are supported")
+
+            br = await _extract_and_map_batch_core(
+                target=target,
+                flow_mode=flow_mode,
+                filename=filename,
+                content_type=content_type,
+                file_bytes=file_bytes,
+                user_id=user.user_id,
+            )
+            # 二次硬校验：按真实 split chunk 数累加，超过 20 立即终止
+            total_chunks += br.chunk_count
+            if total_chunks > settings.max_invoices_per_job:
+                _raise_invoice_limit_exceeded(total_chunks, max_invoices=settings.max_invoices_per_job)
+            items.append(MultiFileBatchItem(file_name=filename, ok=True, batch_result=br))
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            items.append(MultiFileBatchItem(file_name=filename, ok=False, error=str(e)))
+            failed += 1
+
+    result = MultiFileBatchResponse(
+        file_count=len(uploads),
+        items=items,
+        summary={
+            "ok_files": ok,
+            "failed_files": failed,
+            "total_chunks": total_chunks,
+            "max_batch_files": settings.max_batch_files,
+            "max_batch_total_mb": settings.max_batch_total_mb,
+            "account": account_snapshot(user.user_id),
+            "auth_user_id": user.user_id,
+        },
+    )
+    if job_id:
+        upsert_job_result_owned(
+            tenant_id=user.tenant_id,
+            user_id=user.user_id,
+            job_id=job_id,
+            status="completed",
+            result=result.model_dump(),
+        )
+        set_job_status_owned(user.tenant_id, user.user_id, job_id, "completed")
+    return result
+
+
+@app.post("/api/v1/extract-and-map/batch/multi/export.xlsx")
+async def extract_and_map_invoice_batch_multi_export_xlsx(
+    target: Literal["xero", "myob"] = Query(...),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    files: list[UploadFile] = File(...),
+    user: CurrentUser = Depends(_current_user),
+    client_file_count: Optional[int] = Header(default=None, alias="X-Client-File-Count"),
+) -> Response:
+    batch_result = await extract_and_map_invoice_batch_multi(
+        target=target,
+        flow_mode=flow_mode,
+        files=files,
+        user=user,
+        client_file_count=client_file_count,
+    )
+    xlsx_bytes = build_multifile_extraction_workbook(batch_result)
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=batch-extraction.xlsx",
+            "X-Received-Files": str(batch_result.file_count),
+        },
+    )
+
+
+@app.post("/api/v1/extract-and-map/export.xlsx")
+async def extract_and_map_export_xlsx(
+    target: Literal["xero", "myob"] = Query(...),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    files: Optional[list[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
+    user: CurrentUser = Depends(_current_user),
+    client_file_count: Optional[int] = Header(default=None, alias="X-Client-File-Count"),
+) -> Response:
+    uploads = _normalize_upload_inputs(files, file)
+    # 统一成 n-file 导出 schema，避免单/多格式分叉
+    batch_result = await extract_and_map_invoice_batch_multi(
+        target=target,
+        flow_mode=flow_mode,
+        files=uploads,
+        user=user,
+        client_file_count=client_file_count if client_file_count is not None else len(uploads),
+    )
+    xlsx_bytes = build_multifile_extraction_workbook(batch_result)
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=batch-extraction.xlsx",
+            "X-Received-Files": str(batch_result.file_count),
+        },
+    )
+
+
+@app.post("/api/v1/extract-and-map/unified/export.xlsx")
+async def extract_and_map_unified_export_xlsx(
+    target: Literal["xero", "myob"] = Query(...),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    files: list[UploadFile] = File(...),
+    user: CurrentUser = Depends(_current_user),
+    client_file_count: Optional[int] = Header(default=None, alias="X-Client-File-Count"),
+) -> Response:
+    """统一导出入口：无论单张/多张都走同一张 summary 表。"""
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="no files uploaded")
+
+    batch_result = await extract_and_map_invoice_batch_multi(
+        target=target,
+        flow_mode=flow_mode,
+        files=files,
+        user=user,
+        client_file_count=client_file_count,
+    )
+    xlsx_bytes = build_multifile_extraction_workbook(batch_result)
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=batch-extraction.xlsx",
+            "X-Received-Files": str(batch_result.file_count),
+        },
+    )

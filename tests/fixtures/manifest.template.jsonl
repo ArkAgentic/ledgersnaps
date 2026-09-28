@@ -1,0 +1,3 @@
+{"file":"/ABSOLUTE/PATH/TO/invoice-001.pdf","source_type":"xero_demo","ap_or_ar":"ap","expected":{"vendor_name":"Example Supplier Pty Ltd","abn":"51824753556","date":"2026-09-01","total":110.0,"gst":10.0,"document_flow":"ap"}}
+{"file":"/ABSOLUTE/PATH/TO/invoice-002.pdf","source_type":"xero_demo","ap_or_ar":"ar","expected":{"vendor_name":"Example Customer Pty Ltd","invoice_num":"INV-1001","date":"2026-09-03","total":250.0,"document_flow":"ar"}}
+{"file":"/ABSOLUTE/PATH/TO/multi-doc.pdf","source_type":"xero_demo","ap_or_ar":"ap","expected_chunks":[{"chunk_index":1,"expected":{"total":132.0}},{"chunk_index":2,"expected":{"total":242.0}}]}

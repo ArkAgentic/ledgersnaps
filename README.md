@@ -39,13 +39,15 @@ Open: `http://127.0.0.1:8000/`
 - L1 Step A 规则提取：已实现（含质量门）
 - L2 Step B LLM 提取：已实现（按需升级）
 - L3 校验：已实现（必填、金额一致性、ABN/GST 本地+ABR实时提醒）
-- L4 映射：已实现（xero/myob），支持 flow_mode 覆盖
+- L4 映射：已实现（xero/myob），支持 flow_mode 覆盖（Xero AR 基础 Type 切换已支持）
 - L5 学习闭环：未实现（后续接用户修正日志）
 
 ## API 清单
 
 - `POST /api/v1/extract`
 - `POST /api/v1/extract-and-map?target=xero|myob&flow_mode=auto|ap|ar`
+- `POST /api/v1/extract-and-map/batch?target=xero|myob&flow_mode=auto|ap|ar`
+- `POST /api/v1/extract-and-map/batch/multi?target=xero|myob&flow_mode=auto|ap|ar`
 - `POST /api/v1/extract-and-map/export.xlsx?target=xero|myob&flow_mode=auto|ap|ar`
 - `POST /api/v1/compliance/abn-lookup?name=...`
 
@@ -86,6 +88,14 @@ python scripts/eval_invoices.py \
   --target xero \
   --flow-mode auto \
   --out .hermes/reports/invoice-eval-report.json
+
+# 跑批量评估（多页合并 PDF 自动拆分）
+python scripts/eval_invoices.py \
+  --manifest tests/fixtures/manifest.jsonl \
+  --target xero \
+  --flow-mode auto \
+  --batch \
+  --out .hermes/reports/invoice-eval-report-batch.json
 ```
 
 输出包含：
@@ -93,21 +103,43 @@ python scripts/eval_invoices.py \
 - `avg_cost_usd`
 - 字段级准确率（vendor_name/abn/date/total/gst/document_flow 等）
 
+批量模式说明：
+- `--batch` 会调用 `/api/v1/extract-and-map/batch`
+- 对多页合并 PDF 自动拆分并按 `chunk_index` 返回结果
+- `manifest` 可选 `expected_chunks` 做 chunk 级别对比
+
+## P0/P1 当前实现说明
+
+- P0 自动拆分：
+  - 新增 `app/splitter.py`，对 PDF 做 auto 判定（多页多单据时按页拆分；其余保持单文档）。
+  - 判定结果写入 `meta.trace`（`L0 split(auto) ...`）。
+  - 新增批量接口：
+    - `extract-and-map/batch`（单文件内多 chunk）
+    - `extract-and-map/batch/multi`（多文件 + 每文件自动 split）
+  - 批量保护阈值：`max_batch_files=20`、`max_batch_total_mb=100`
+
+- P1 GST 分层字段：
+  - `invoice.gst_extracted`
+  - `invoice.gst_inferred`
+  - `invoice.gst_source`（`extracted|inferred|none`）
+  - `invoice.gst_confidence`
+  - 当前策略：无票面 GST 不自动硬算，等待 ABR/GST 注册校验后再推断。
+
 ## Test your sample invoice files
 
 ```bash
-curl -sS -X POST "http://127.0.0.1:8000/api/v1/extract?mock=true" \
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/extract" \
   -F "file=@/Users/charleszhang/Desktop/LedgerSnaps/Testing\ Invoices/INV-25146\ -\ Brightstone\ Legal\ Invoice.pdf"
 
-curl -sS -X POST "http://127.0.0.1:8000/api/v1/extract-and-map?target=xero&flow_mode=auto&mock=true" \
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/extract-and-map?target=xero&flow_mode=auto" \
   -F "file=@/Users/charleszhang/Desktop/LedgerSnaps/Testing\ Invoices/A-8F116502-origin-statement-2025-10-27.pdf"
 
-curl -sS -X POST "http://127.0.0.1:8000/api/v1/extract-and-map/export.xlsx?target=xero&flow_mode=auto&mock=true" \
+curl -sS -X POST "http://127.0.0.1:8000/api/v1/extract-and-map/export.xlsx?target=xero&flow_mode=auto" \
   -F "file=@/Users/charleszhang/Desktop/LedgerSnaps/Testing\ Invoices/INV-25146\ -\ Brightstone\ Legal\ Invoice.pdf" \
   -o /Users/charleszhang/Desktop/LedgerSnaps/Testing\ Invoices/INV-25146-extraction.xlsx
 ```
 
-Then switch `mock=false` in playground or query string for real model extraction.
+Playground and APIs now run real extraction path by default (no mock mode).
 
 ## Tests
 

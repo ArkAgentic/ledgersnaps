@@ -1,0 +1,5 @@
+{"file":"/Users/charleszhang/Desktop/LedgerSnaps/Xero Demo Testing Files/Invoice Sub.pdf","source_type":"xero_demo","ap_or_ar":"ap","expected":{"total":132.0,"gst":12.0,"document_flow":"unknown"}}
+{"file":"/Users/charleszhang/Desktop/LedgerSnaps/Xero Demo Testing Files/Invoice CS815.pdf","source_type":"xero_demo","ap_or_ar":"ap","expected":{"total":242.0,"gst":22.0,"document_flow":"unknown"}}
+{"file":"/Users/charleszhang/Desktop/LedgerSnaps/Xero Demo Testing Files/Invoice GB1-White.pdf","source_type":"xero_demo","ap_or_ar":"ap","expected":{"total":840.0,"gst":76.36,"document_flow":"unknown"}}
+{"file":"/Users/charleszhang/Desktop/LedgerSnaps/Xero Demo Testing Files/Invoice 25092026.pdf","source_type":"xero_demo","ap_or_ar":"ap","expected":{"total":115.2,"gst":0.0,"document_flow":"unknown"}}
+{"file":"/Users/charleszhang/Desktop/LedgerSnaps/Xero Demo Testing Files/Invoice 25092026 (1).pdf","source_type":"xero_demo","ap_or_ar":"ap","expected":{"total":53.9,"gst":4.9,"document_flow":"unknown"}}
