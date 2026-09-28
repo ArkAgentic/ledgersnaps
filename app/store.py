@@ -48,6 +48,11 @@ def init_db() -> None:
             )
             """
         )
+        jobs_cols = {r[1] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+        if "invoice_extracted_count" not in jobs_cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN invoice_extracted_count INTEGER NOT NULL DEFAULT 0")
+        if "extracted_total_amount" not in jobs_cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN extracted_total_amount REAL NOT NULL DEFAULT 0")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS job_results (
@@ -89,6 +94,7 @@ def init_db() -> None:
         if "last_attempt_at" not in cols:
             conn.execute("ALTER TABLE job_queue ADD COLUMN last_attempt_at TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_created ON jobs(tenant_id, user_id, created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_status ON jobs(tenant_id, user_id, status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_job_results_owner ON job_results(tenant_id, user_id, updated_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_job_queue_status_available ON job_queue(status, available_at)")
         conn.commit()
@@ -155,6 +161,36 @@ def set_job_status_owned(tenant_id: str, user_id: str, job_id: str, status: str)
             WHERE tenant_id=? AND user_id=? AND job_id=?
             """,
             (status, now, tenant_id, user_id, job_id),
+        )
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def set_job_extraction_metrics_owned(
+    tenant_id: str,
+    user_id: str,
+    job_id: str,
+    *,
+    invoice_extracted_count: int,
+    extracted_total_amount: float,
+) -> bool:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        cur = conn.execute(
+            """
+            UPDATE jobs
+            SET invoice_extracted_count=?, extracted_total_amount=?, updated_at=?
+            WHERE tenant_id=? AND user_id=? AND job_id=?
+            """,
+            (
+                int(max(0, invoice_extracted_count)),
+                float(max(0.0, extracted_total_amount)),
+                now,
+                tenant_id,
+                user_id,
+                job_id,
+            ),
         )
         conn.commit()
     return cur.rowcount > 0
@@ -382,7 +418,7 @@ def list_jobs_owned(tenant_id: str, user_id: str, limit: int = 50) -> list[dict[
     conn = _ensure_conn()
     cur = conn.execute(
         """
-        SELECT job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, metadata_json
+        SELECT job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, invoice_extracted_count, extracted_total_amount, metadata_json
         FROM jobs
         WHERE tenant_id=? AND user_id=?
         ORDER BY created_at DESC
@@ -398,7 +434,7 @@ def get_job_owned(tenant_id: str, user_id: str, job_id: str) -> Optional[dict[st
     conn = _ensure_conn()
     cur = conn.execute(
         """
-        SELECT job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, metadata_json
+        SELECT job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, invoice_extracted_count, extracted_total_amount, metadata_json
         FROM jobs
         WHERE tenant_id=? AND user_id=? AND job_id=?
         LIMIT 1

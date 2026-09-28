@@ -23,6 +23,7 @@ from .store import (
     mark_job_queue_done,
     mark_job_queue_failed,
     mark_job_queue_retry,
+    set_job_extraction_metrics_owned,
     set_job_status_owned,
     upsert_job_result_owned,
 )
@@ -172,12 +173,29 @@ async def _process_payload(item: dict[str, Any], finalize_queue: bool) -> dict[s
             "user_id": user_id,
             "batch_result": br.model_dump(),
         }
+        extracted_count = int(br.summary.get("ok", 0) or 0)
+        total_amount = 0.0
+        for ch in br.chunks:
+            try:
+                v = ch.result.invoice.total
+                if v is not None:
+                    total_amount += float(v)
+            except Exception:
+                pass
+
         upsert_job_result_owned(
             tenant_id=tenant_id,
             user_id=user_id,
             job_id=job_id,
             status="completed",
             result=result_payload,
+        )
+        set_job_extraction_metrics_owned(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            job_id=job_id,
+            invoice_extracted_count=extracted_count,
+            extracted_total_amount=round(total_amount, 2),
         )
         set_job_status_owned(tenant_id, user_id, job_id, "completed")
         if finalize_queue:

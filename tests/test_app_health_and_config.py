@@ -3,7 +3,7 @@ import os
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.store import get_queue_item, reset_all_jobs_for_tests
+from app.store import get_queue_item, get_job_owned, reset_all_jobs_for_tests
 from app.storage_backend import artifact_exists_local
 from app.worker import process_claimed_item, process_one_queued_job
 
@@ -62,12 +62,12 @@ def test_billing_endpoints_default_and_plan_switch():
 
     r = client.get("/api/v1/billing/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
-    assert r.json()["account"]["plan_id"] == "trial"
+    assert r.json()["account"]["plan_id"] == "none"
 
-    r2 = client.post("/api/v1/billing/plan?plan_id=pro_39_9", headers={"Authorization": f"Bearer {token}"})
+    r2 = client.post("/api/v1/billing/plan?plan_id=pro_29_95", headers={"Authorization": f"Bearer {token}"})
     assert r2.status_code == 200
-    assert r2.json()["account"]["plan_id"] == "pro_39_9"
-    assert r2.json()["account"]["invoice_limit"] == 500
+    assert r2.json()["account"]["plan_id"] == "pro_29_95"
+    assert r2.json()["account"]["plan"]["invoice_limit"] == 300
 
 
 def test_auth_dev_token_then_billing_me_with_bearer():
@@ -274,6 +274,12 @@ def test_jobs_submit_upload_and_worker_cleanup_local_artifact():
     assert jr.status_code == 200
     assert jr.json()["job_result"]["status"] in {"completed", "failed"}
 
+    # job-level metrics are tracked
+    job = get_job_owned("t1", "submit-user", job_id)
+    assert job is not None
+    assert int(job.get("invoice_extracted_count", 0)) >= 0
+    assert float(job.get("extracted_total_amount", 0.0)) >= 0.0
+
 
 def test_queue_backend_servicebus_without_config_fails_fast():
     from app.queue_backend import QueueBackend, QueueMessage
@@ -348,3 +354,32 @@ def test_root_page_contains_logged_in_text_for_client_a_flow():
     assert "onclick=\"loginAs('client-a'); return false;\"" in html
     assert "Script loaded, waiting login..." in html
     assert r.headers.get("cache-control", "").startswith("no-store")
+
+
+def test_billing_trial_and_topup_plan_pricing_contract():
+    t = client.get("/api/v1/auth/dev-token?user_id=pricing-user&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+
+    me = client.get("/api/v1/billing/me", headers=h)
+    assert me.status_code == 200
+    body = me.json()
+    assert body["account"]["trial"]["invoice_limit"] == 15
+    assert body["account"]["trial"]["active"] is True
+
+    p = client.post("/api/v1/billing/plan?plan_id=starter_14_95", headers=h)
+    assert p.status_code == 200
+    assert p.json()["account"]["plan_id"] == "starter_14_95"
+    assert p.json()["account"]["price_aud"] == 14.95
+    assert p.json()["account"]["plan"]["invoice_limit"] == 100
+
+    p2 = client.post("/api/v1/billing/plan?plan_id=pro_29_95", headers=h)
+    assert p2.status_code == 200
+    assert p2.json()["account"]["plan_id"] == "pro_29_95"
+    assert p2.json()["account"]["price_aud"] == 29.95
+    assert p2.json()["account"]["plan"]["invoice_limit"] == 300
+
+    tp = client.post("/api/v1/billing/topup?packs=2", headers=h)
+    assert tp.status_code == 200
+    assert tp.json()["pack_size"] == 50
+    assert tp.json()["pack_price_aud"] == 5.95
+    assert tp.json()["added_invoices"] == 100

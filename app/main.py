@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from .abn import abr_lookup_by_name, compliance_warnings_for_abn, lookup_abn_context
 from .auth import CurrentUser, bearer_scheme, issue_dev_token, resolve_current_user
-from .billing import PLAN_CATALOG, account_snapshot, can_consume, consume_invoices, set_plan
+from .billing import PLAN_CATALOG, TOPUP_PACK_PRICE_AUD, TOPUP_PACK_SIZE, account_snapshot, add_topup, can_consume, consume_invoices, set_plan
 from .config import settings
 from .exporter import build_multifile_extraction_workbook
 from .flow import classify_document_flow
@@ -685,6 +685,23 @@ async def billing_set_plan(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {"account": account_snapshot(user.user_id)}
+
+
+@app.post("/api/v1/billing/topup")
+async def billing_topup(
+    packs: int = Query(1, ge=1, le=20),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    # v1: pack grant endpoint (payment integration can call this after successful checkout)
+    st = add_topup(user.user_id, packs=packs)
+    return {
+        "ok": True,
+        "packs": packs,
+        "pack_size": TOPUP_PACK_SIZE,
+        "pack_price_aud": TOPUP_PACK_PRICE_AUD,
+        "added_invoices": packs * TOPUP_PACK_SIZE,
+        "account": account_snapshot(st.user_id),
+    }
 
 
 @app.post("/api/v1/compliance/abn-lookup")
