@@ -55,6 +55,20 @@ Build a production-ready extraction pipeline where:
 - Retry policy: e.g. max 3 attempts then DLQ
 - Idempotency key = `job_id` (replays must not duplicate rows)
 
+## Current implementation status (2026-09)
+- Producer path:
+  - `QueueBackend(kind=sqlite|servicebus)` implemented.
+  - `POST /api/v1/jobs` enqueues via backend abstraction.
+  - `servicebus` mode hard-fails if env is missing (no silent drop).
+- Consumer path:
+  - `scripts/run_worker.py` supports both backends.
+  - `sqlite` mode consumes local `job_queue` via `process_one_queued_job()`.
+  - `servicebus` mode receives one message and processes it through `process_claimed_item(...)`, then `complete_message` on success / dead-letter on failure.
+- Processing path:
+  - Owner-scoped status transitions are enforced (`queued -> running -> completed|failed`).
+  - Placeholder completion is still used for `jobs_create` without input artifact.
+  - Real extract execution path is available when payload carries `file_data_b64` (intermediate local bridge before Blob/SAS wiring).
+
 ## Capacity baseline for 100 concurrent users
 - API replicas: start 2-3
 - Worker replicas: autoscale by queue length / active messages

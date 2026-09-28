@@ -33,6 +33,11 @@ class QueueBackend:
         # default sqlite
         return self._enqueue_sqlite(msg)
 
+    def consume_once(self) -> Optional[dict[str, Any]]:
+        if self.kind == "servicebus":
+            return self._consume_servicebus_once()
+        return None
+
     def _enqueue_sqlite(self, msg: QueueMessage) -> dict[str, Any]:
         enqueue_job_owned(
             tenant_id=msg.tenant_id,
@@ -73,3 +78,39 @@ class QueueBackend:
                 sender.send_messages(ServiceBusMessage(body))
 
         return {"backend": "servicebus", "enqueued": True, "queue": queue_name}
+
+    def _consume_servicebus_once(self) -> Optional[dict[str, Any]]:
+        connection = os.getenv("AZURE_SERVICEBUS_CONNECTION_STRING", "").strip()
+        queue_name = os.getenv("AZURE_SERVICEBUS_QUEUE_NAME", "").strip()
+        if not connection or not queue_name:
+            raise RuntimeError("servicebus_not_configured: set AZURE_SERVICEBUS_CONNECTION_STRING and AZURE_SERVICEBUS_QUEUE_NAME")
+
+        try:
+            from azure.servicebus import ServiceBusClient  # type: ignore
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError("servicebus_sdk_missing: pip install azure-servicebus") from e
+
+        with ServiceBusClient.from_connection_string(connection) as client:
+            receiver = client.get_queue_receiver(queue_name=queue_name, max_wait_time=2)
+            with receiver:
+                msgs = receiver.receive_messages(max_message_count=1, max_wait_time=2)
+                if not msgs:
+                    return None
+                msg = msgs[0]
+                try:
+                    body_text = b"".join([bytes(x) for x in msg.body]).decode("utf-8")
+                    envelope = json.loads(body_text)
+                    item = {
+                        "job_id": envelope["job_id"],
+                        "tenant_id": envelope["tenant_id"],
+                        "user_id": envelope["user_id"],
+                        "payload": envelope.get("payload", {}),
+                    }
+                    from .worker import process_claimed_item
+
+                    out = process_claimed_item(item, finalize_queue=False)
+                    receiver.complete_message(msg)
+                    return {"backend": "servicebus", **out}
+                except Exception:
+                    receiver.dead_letter_message(msg)
+                    raise

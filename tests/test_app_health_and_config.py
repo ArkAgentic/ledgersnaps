@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.store import get_queue_item, reset_all_jobs_for_tests
-from app.worker import process_one_queued_job
+from app.worker import process_claimed_item, process_one_queued_job
 
 
 client = TestClient(app)
@@ -206,6 +206,37 @@ def test_local_worker_processes_queued_job_end_to_end():
     jr = client.get(f"/api/v1/jobs/{job_id}/result", headers=h)
     assert jr.status_code == 200
     assert jr.json()["job_result"]["status"] == "completed"
+
+
+def test_worker_process_claimed_item_missing_artifact_sets_failed():
+    reset_all_jobs_for_tests()
+    t = client.get("/api/v1/auth/dev-token?user_id=worker-fail&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+
+    c = client.post("/api/v1/jobs?file_count=1&invoice_estimated=1", headers=h)
+    assert c.status_code == 200
+    job_id = c.json()["job"]["job_id"]
+
+    # fabricate a claimed item with non-placeholder source but no input artifact
+    item = {
+        "job_id": job_id,
+        "tenant_id": "t1",
+        "user_id": "worker-fail",
+        "payload": {
+            "source": "upload",
+            "target": "xero",
+            "flow_mode": "auto",
+            "filename": "x.pdf",
+            "content_type": "application/pdf",
+        },
+    }
+    out = process_claimed_item(item)
+    assert out["status"] == "failed"
+    assert "missing_input_artifact" in out["reason"]
+
+    j = client.get(f"/api/v1/jobs/{job_id}", headers=h)
+    assert j.status_code == 200
+    assert j.json()["job"]["status"] == "failed"
 
 
 def test_queue_backend_servicebus_without_config_fails_fast():
