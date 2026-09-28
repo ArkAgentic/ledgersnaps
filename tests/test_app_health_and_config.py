@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.store import get_queue_item, reset_all_jobs_for_tests
+from app.storage_backend import artifact_exists_local
 from app.worker import process_claimed_item, process_one_queued_job
 
 
@@ -237,6 +238,41 @@ def test_worker_process_claimed_item_missing_artifact_sets_failed():
     j = client.get(f"/api/v1/jobs/{job_id}", headers=h)
     assert j.status_code == 200
     assert j.json()["job"]["status"] == "failed"
+
+
+def test_jobs_submit_upload_and_worker_cleanup_local_artifact():
+    reset_all_jobs_for_tests()
+    t = client.get("/api/v1/auth/dev-token?user_id=submit-user&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+
+    c = client.post("/api/v1/jobs?file_count=1&invoice_estimated=1", headers=h)
+    assert c.status_code == 200
+    job_id = c.json()["job"]["job_id"]
+
+    s = client.post(
+        f"/api/v1/jobs/{job_id}/submit?target=xero&flow_mode=auto",
+        headers=h,
+        files={"file": ("a.jpg", b"fake-image", "image/jpeg")},
+    )
+    assert s.status_code == 200
+    assert s.json()["status"] == "queued"
+
+    item = get_queue_item(job_id)
+    assert item is not None
+    artifact_ref = item["payload"].get("artifact_ref")
+    assert artifact_ref
+    assert artifact_exists_local(artifact_ref)
+
+    out = process_one_queued_job()
+    assert out is not None
+    assert out["job_id"] == job_id
+    assert out["status"] in {"completed", "failed"}
+
+    assert artifact_exists_local(artifact_ref) is False
+
+    jr = client.get(f"/api/v1/jobs/{job_id}/result", headers=h)
+    assert jr.status_code == 200
+    assert jr.json()["job_result"]["status"] in {"completed", "failed"}
 
 
 def test_queue_backend_servicebus_without_config_fails_fast():

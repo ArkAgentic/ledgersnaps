@@ -67,7 +67,18 @@ Build a production-ready extraction pipeline where:
 - Processing path:
   - Owner-scoped status transitions are enforced (`queued -> running -> completed|failed`).
   - Placeholder completion is still used for `jobs_create` without input artifact.
-  - Real extract execution path is available when payload carries `file_data_b64` (intermediate local bridge before Blob/SAS wiring).
+  - Real extract execution path is available when payload carries input artifact reference.
+
+### Newly landed in this iteration
+- Added `POST /api/v1/jobs/{job_id}/submit`:
+  - owner checks + pre-extract invoice cap validation
+  - persists temp artifact via storage backend (`localfs` now, `azureblob` when configured)
+  - enqueues queue message with `artifact_ref` + `artifact_backend`
+- Worker now resolves artifact by reference:
+  - download/read artifact bytes from backend
+  - run extraction pipeline
+  - write owner-scoped result
+  - delete temp artifact in `finally` (best effort cleanup)
 
 ## Capacity baseline for 100 concurrent users
 - API replicas: start 2-3

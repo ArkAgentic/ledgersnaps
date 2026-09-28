@@ -112,6 +112,31 @@ def create_job(tenant_id: str, user_id: str, *, file_count: int = 0, invoice_est
     return job
 
 
+def update_job_submission_owned(
+    tenant_id: str,
+    user_id: str,
+    job_id: str,
+    *,
+    file_count: int,
+    invoice_estimated: int,
+    metadata: dict[str, Any],
+) -> bool:
+    conn = _ensure_conn()
+    now = _now_iso()
+    metadata_json = json.dumps(metadata, ensure_ascii=False)
+    with _DB_LOCK:
+        cur = conn.execute(
+            """
+            UPDATE jobs
+            SET file_count=?, invoice_estimated=?, metadata_json=?, updated_at=?
+            WHERE tenant_id=? AND user_id=? AND job_id=?
+            """,
+            (int(file_count), int(invoice_estimated), metadata_json, now, tenant_id, user_id, job_id),
+        )
+        conn.commit()
+    return cur.rowcount > 0
+
+
 def set_job_status_owned(tenant_id: str, user_id: str, job_id: str, status: str) -> bool:
     conn = _ensure_conn()
     now = _now_iso()

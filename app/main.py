@@ -31,7 +31,8 @@ from .schemas import (
     UsageCost,
 )
 from .splitter import split_pdf_auto
-from .store import create_job, get_job_owned, get_job_result_owned, list_jobs_owned, set_job_status_owned, upsert_job_result_owned
+from .storage_backend import StorageBackend
+from .store import create_job, get_job_owned, get_job_result_owned, list_jobs_owned, set_job_status_owned, upsert_job_result_owned, update_job_submission_owned
 from .store import list_queue_counts
 from .validators import validate_pdf_bytes
 from .xero_mapper import to_xero_accpay_draft
@@ -722,6 +723,82 @@ async def jobs_create(
         )
     )
     return {"job": job}
+
+
+@app.post("/api/v1/jobs/{job_id}/submit")
+async def jobs_submit(
+    job_id: str,
+    target: Literal["xero", "myob"] = Query("xero"),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    owned = get_job_owned(tenant_id=user.tenant_id, user_id=user.user_id, job_id=job_id)
+    if not owned:
+        raise HTTPException(status_code=404, detail="job_not_found")
+
+    filename = file.filename or "upload"
+    content_type = (file.content_type or "").lower()
+    file_bytes = await file.read()
+
+    _validate_upload(file_bytes, filename, content_type)
+    estimated = _estimate_invoices_from_upload(filename, content_type, file_bytes)
+    if estimated > settings.max_invoices_per_job:
+        _raise_invoice_limit_exceeded(estimated, max_invoices=settings.max_invoices_per_job)
+
+    storage = StorageBackend()
+    stored = storage.put_bytes(
+        tenant_id=user.tenant_id,
+        user_id=user.user_id,
+        job_id=job_id,
+        filename=filename,
+        content=file_bytes,
+    )
+
+    # persist estimated count metadata on the job row for observability
+    ok = update_job_submission_owned(
+        tenant_id=user.tenant_id,
+        user_id=user.user_id,
+        job_id=job_id,
+        file_count=1,
+        invoice_estimated=int(estimated),
+        metadata={
+            "artifact_ref": stored.artifact_ref,
+            "artifact_backend": stored.backend,
+            "artifact_size_bytes": stored.size_bytes,
+            "filename": filename,
+            "content_type": content_type,
+            "invoice_estimated": estimated,
+        },
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="job_not_found")
+
+    set_job_status_owned(user.tenant_id, user.user_id, job_id, "queued")
+    queue_backend.enqueue(
+        QueueMessage(
+            job_id=job_id,
+            tenant_id=user.tenant_id,
+            user_id=user.user_id,
+            payload={
+                "source": "upload",
+                "target": target,
+                "flow_mode": flow_mode,
+                "filename": filename,
+                "content_type": content_type,
+                "artifact_ref": stored.artifact_ref,
+                "artifact_backend": stored.backend,
+                "invoice_estimated": estimated,
+            },
+        )
+    )
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "artifact_backend": stored.backend,
+        "artifact_size_bytes": stored.size_bytes,
+        "invoice_estimated": estimated,
+    }
 
 
 @app.get("/api/v1/jobs")

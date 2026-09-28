@@ -13,6 +13,7 @@ from .billing import can_consume, consume_invoices
 from .main import _extract_and_map_core, _extract_and_map_from_bytes
 from .schemas import BatchExtractAndMapResponse, ExtractAndMapChunkResult
 from .splitter import split_pdf_auto
+from .storage_backend import StorageBackend
 from .store import (
     dequeue_next_job,
     get_job_owned,
@@ -139,47 +140,56 @@ async def _process_payload(item: dict[str, Any], finalize_queue: bool) -> dict[s
     filename = str(payload.get("filename", "upload.pdf"))
     content_type = str(payload.get("content_type", "application/pdf"))
 
-    file_data_b64 = payload.get("file_data_b64")
-    if file_data_b64:
-        file_bytes = base64.b64decode(file_data_b64)
+    storage = StorageBackend(payload.get("artifact_backend"))
+    artifact_ref = str(payload.get("artifact_ref", "") or "")
+    if artifact_ref:
+        file_bytes = storage.get_bytes(artifact_ref)
     else:
-        raise RuntimeError("missing_input_artifact")
+        file_data_b64 = payload.get("file_data_b64")
+        if file_data_b64:
+            file_bytes = base64.b64decode(file_data_b64)
+        else:
+            raise RuntimeError("missing_input_artifact")
 
-    br = await _extract_and_map_batch_core_worker(
-        target=cast(Literal["xero", "myob"], target),
-        flow_mode=cast(Literal["auto", "ap", "ar"], flow_mode),
-        filename=filename,
-        content_type=content_type,
-        file_bytes=file_bytes,
-        user_id=user_id,
-    )
+    try:
+        br = await _extract_and_map_batch_core_worker(
+            target=cast(Literal["xero", "myob"], target),
+            flow_mode=cast(Literal["auto", "ap", "ar"], flow_mode),
+            filename=filename,
+            content_type=content_type,
+            file_bytes=file_bytes,
+            user_id=user_id,
+        )
 
-    result_payload = {
-        "kind": "worker-batch-result",
-        "job_id": job_id,
-        "tenant_id": tenant_id,
-        "user_id": user_id,
-        "batch_result": br.model_dump(),
-    }
-    upsert_job_result_owned(
-        tenant_id=tenant_id,
-        user_id=user_id,
-        job_id=job_id,
-        status="completed",
-        result=result_payload,
-    )
-    set_job_status_owned(tenant_id, user_id, job_id, "completed")
-    if finalize_queue:
-        mark_job_queue_done(job_id, "completed")
+        result_payload = {
+            "kind": "worker-batch-result",
+            "job_id": job_id,
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "batch_result": br.model_dump(),
+        }
+        upsert_job_result_owned(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            job_id=job_id,
+            status="completed",
+            result=result_payload,
+        )
+        set_job_status_owned(tenant_id, user_id, job_id, "completed")
+        if finalize_queue:
+            mark_job_queue_done(job_id, "completed")
 
-    row = get_job_result_owned(tenant_id=tenant_id, user_id=user_id, job_id=job_id)
-    return {
-        "job_id": job_id,
-        "status": "completed",
-        "has_result": bool(row),
-        "ok_chunks": br.summary.get("ok", 0),
-        "mode": "extract",
-    }
+        row = get_job_result_owned(tenant_id=tenant_id, user_id=user_id, job_id=job_id)
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "has_result": bool(row),
+            "ok_chunks": br.summary.get("ok", 0),
+            "mode": "extract",
+        }
+    finally:
+        if artifact_ref:
+            storage.delete(artifact_ref)
 
 
 def process_claimed_item(item: dict[str, Any], finalize_queue: bool = True) -> dict[str, Any]:
