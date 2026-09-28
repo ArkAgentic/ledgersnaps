@@ -81,6 +81,13 @@ def init_db() -> None:
             )
             """
         )
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(job_queue)").fetchall()}
+        if "last_error" not in cols:
+            conn.execute("ALTER TABLE job_queue ADD COLUMN last_error TEXT")
+        if "last_error_at" not in cols:
+            conn.execute("ALTER TABLE job_queue ADD COLUMN last_error_at TEXT")
+        if "last_attempt_at" not in cols:
+            conn.execute("ALTER TABLE job_queue ADD COLUMN last_attempt_at TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_created ON jobs(tenant_id, user_id, created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_job_results_owner ON job_results(tenant_id, user_id, updated_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_job_queue_status_available ON job_queue(status, available_at)")
@@ -222,6 +229,48 @@ def mark_job_queue_done(job_id: str, status: str) -> None:
         conn.commit()
 
 
+def mark_job_queue_retry(job_id: str, *, error: str, backoff_seconds: int) -> None:
+    conn = _ensure_conn()
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
+    available_at = (now_dt.timestamp() + max(1, int(backoff_seconds)))
+    available_at_iso = datetime.fromtimestamp(available_at, tz=timezone.utc).isoformat()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET status='queued',
+                available_at=?,
+                last_error=?,
+                last_error_at=?,
+                last_attempt_at=?,
+                updated_at=?
+            WHERE job_id=?
+            """,
+            (available_at_iso, str(error)[:2000], now, now, now, job_id),
+        )
+        conn.commit()
+
+
+def mark_job_queue_failed(job_id: str, *, error: str) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET status='failed',
+                last_error=?,
+                last_error_at=?,
+                last_attempt_at=?,
+                updated_at=?
+            WHERE job_id=?
+            """,
+            (str(error)[:2000], now, now, now, job_id),
+        )
+        conn.commit()
+
+
 def list_queue_counts() -> dict[str, int]:
     conn = _ensure_conn()
     out = {"queued": 0, "running": 0, "completed": 0, "failed": 0}
@@ -237,7 +286,7 @@ def get_queue_item(job_id: str) -> Optional[dict[str, Any]]:
     conn = _ensure_conn()
     cur = conn.execute(
         """
-        SELECT id, job_id, tenant_id, user_id, status, attempts, available_at, locked_at, worker_id, payload_json, created_at, updated_at
+        SELECT id, job_id, tenant_id, user_id, status, attempts, available_at, locked_at, worker_id, payload_json, last_error, last_error_at, last_attempt_at, created_at, updated_at
         FROM job_queue
         WHERE job_id=?
         LIMIT 1
@@ -253,6 +302,15 @@ def get_queue_item(job_id: str) -> Optional[dict[str, Any]]:
     except Exception:
         d["payload"] = {}
     return d
+
+
+def get_queue_attempts(job_id: str) -> int:
+    conn = _ensure_conn()
+    cur = conn.execute("SELECT attempts FROM job_queue WHERE job_id=? LIMIT 1", (job_id,))
+    row = cur.fetchone()
+    if not row:
+        return 0
+    return int(row["attempts"])
 
 
 def dequeue_next_job(worker_id: str) -> Optional[dict[str, Any]]:

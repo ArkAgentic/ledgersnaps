@@ -55,6 +55,15 @@ Build a production-ready extraction pipeline where:
 - Retry policy: e.g. max 3 attempts then DLQ
 - Idempotency key = `job_id` (replays must not duplicate rows)
 
+### Retry/DLQ behavior (implemented in local queue model)
+- Config knobs:
+  - `max_job_attempts` (default `3`)
+  - `retry_backoff_seconds` (default `15`)
+- On worker failure:
+  - if attempts < max: queue row is re-queued with delayed `available_at`, and `last_error` / timestamps are persisted.
+  - if attempts >= max: queue row is marked `failed` (DLQ-equivalent terminal state in sqlite model).
+- This state model is designed to map 1:1 to Service Bus retry + DLQ semantics in production.
+
 ## Current implementation status (2026-09)
 - Producer path:
   - `QueueBackend(kind=sqlite|servicebus)` implemented.

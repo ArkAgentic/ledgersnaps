@@ -14,11 +14,15 @@ from .main import _extract_and_map_core, _extract_and_map_from_bytes
 from .schemas import BatchExtractAndMapResponse, ExtractAndMapChunkResult
 from .splitter import split_pdf_auto
 from .storage_backend import StorageBackend
+from .config import settings
 from .store import (
     dequeue_next_job,
     get_job_owned,
     get_job_result_owned,
+    get_queue_attempts,
     mark_job_queue_done,
+    mark_job_queue_failed,
+    mark_job_queue_retry,
     set_job_status_owned,
     upsert_job_result_owned,
 )
@@ -208,17 +212,21 @@ def process_claimed_item(item: dict[str, Any], finalize_queue: bool = True) -> d
     try:
         return asyncio.run(_process_payload(item, finalize_queue=finalize_queue))
     except Exception as e:  # noqa: BLE001
+        attempts = get_queue_attempts(job_id)
         upsert_job_result_owned(
             tenant_id=tenant_id,
             user_id=user_id,
             job_id=job_id,
             status="failed",
-            result={"error": str(e), "job_id": job_id},
+            result={"error": str(e), "job_id": job_id, "attempts": attempts},
         )
         set_job_status_owned(tenant_id, user_id, job_id, "failed")
         if finalize_queue:
-            mark_job_queue_done(job_id, "failed")
-        return {"job_id": job_id, "status": "failed", "reason": str(e)}
+            if attempts >= int(settings.max_job_attempts):
+                mark_job_queue_failed(job_id, error=str(e))
+            else:
+                mark_job_queue_retry(job_id, error=str(e), backoff_seconds=int(settings.retry_backoff_seconds))
+        return {"job_id": job_id, "status": "failed", "reason": str(e), "attempts": attempts}
 
 
 def process_one_queued_job() -> Optional[dict[str, Any]]:

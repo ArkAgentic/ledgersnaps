@@ -10,6 +10,9 @@ class Settings(BaseModel):
     max_invoices_per_job: int = 20
     # Queue backend: sqlite (default) | servicebus
     queue_backend: str = "sqlite"
+    # Worker retry policy
+    max_job_attempts: int = 3
+    retry_backoff_seconds: int = 15
 
 
 settings = Settings()

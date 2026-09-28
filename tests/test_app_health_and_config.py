@@ -286,6 +286,57 @@ def test_queue_backend_servicebus_without_config_fails_fast():
         assert "servicebus_not_configured" in str(e)
 
 
+def test_worker_retry_then_fail_after_max_attempts():
+    import time
+    import app.worker as worker_mod
+
+    reset_all_jobs_for_tests()
+    t = client.get("/api/v1/auth/dev-token?user_id=retry-user&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+
+    c = client.post("/api/v1/jobs?file_count=1&invoice_estimated=1", headers=h)
+    assert c.status_code == 200
+    job_id = c.json()["job"]["job_id"]
+
+    s = client.post(
+        f"/api/v1/jobs/{job_id}/submit?target=xero&flow_mode=auto",
+        headers=h,
+        files={"file": ("a.jpg", b"fake-image", "image/jpeg")},
+    )
+    assert s.status_code == 200
+
+    # break artifact before worker consumes, to force retry/failure path
+    q0 = get_queue_item(job_id)
+    assert q0 is not None
+    artifact_ref = q0["payload"].get("artifact_ref")
+    assert artifact_ref and artifact_exists_local(artifact_ref)
+    from pathlib import Path
+
+    Path(artifact_ref.replace("localfs://", "", 1)).unlink()
+
+    old_max = worker_mod.settings.max_job_attempts
+    old_backoff = worker_mod.settings.retry_backoff_seconds
+    worker_mod.settings.max_job_attempts = 2
+    worker_mod.settings.retry_backoff_seconds = 1
+    try:
+        out1 = process_one_queued_job()
+        assert out1 is not None and out1["status"] == "failed"
+        q1 = get_queue_item(job_id)
+        assert q1 is not None
+        assert q1["status"] == "queued"
+        assert q1.get("last_error")
+
+        time.sleep(1.1)
+        out2 = process_one_queued_job()
+        assert out2 is not None and out2["status"] == "failed"
+        q2 = get_queue_item(job_id)
+        assert q2 is not None
+        assert q2["status"] == "failed"
+    finally:
+        worker_mod.settings.max_job_attempts = old_max
+        worker_mod.settings.retry_backoff_seconds = old_backoff
+
+
 def test_root_page_contains_logged_in_text_for_client_a_flow():
     r = client.get("/")
     assert r.status_code == 200
