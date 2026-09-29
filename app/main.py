@@ -192,6 +192,12 @@ async def playground() -> HTMLResponse:
 <div style='margin:6px 0;color:#888;font-size:12px;'>build=auth-ui-v3</div>
 <p>Upload invoices/bills and run unified batch extract+map.</p>
 <div id='auth' style='margin:8px 0;color:#222;'>Not logged in</div>
+<div style='margin:8px 0;padding:8px;border:1px solid #ddd;'>
+  <div style='font-size:12px;color:#666;margin-bottom:6px;'>Phone verification (trial claim)</div>
+  <input id='phone' placeholder='+61400111222' style='width:180px;' />
+  <button id='sendCode'>Send Code</button>
+  <input id='otp' placeholder='OTP code' style='width:100px;' />
+</div>
 <button id='loginA' onclick="loginAs('client-a'); return false;">Login as client A</button>
 <button id='loginB' onclick="loginAs('client-b'); return false;">Login as client B</button>
 <div id='debug' style='margin:8px 0;color:#666;font-size:12px;white-space:pre-wrap;'></div>
@@ -222,7 +228,15 @@ function logDebug(msg){
 
 async function loginAs(userId, tenantId='default'){
   logDebug('loginAs called: '+userId+' tenant='+tenantId);
-  const r = await fetch(`/api/v1/auth/dev-token?user_id=${encodeURIComponent(userId)}&tenant_id=${encodeURIComponent(tenantId)}`);
+  var phone = (document.getElementById('phone').value || '').trim();
+  var otp = (document.getElementById('otp').value || '').trim();
+  var q = `/api/v1/auth/dev-token?user_id=${encodeURIComponent(userId)}&tenant_id=${encodeURIComponent(tenantId)}`;
+  if(phone){
+    q += `&phone_e164=${encodeURIComponent(phone)}`;
+    if(otp){ q += `&phone_otp_code=${encodeURIComponent(otp)}`; }
+    q += `&device_fingerprint=${encodeURIComponent('browser-local')}`;
+  }
+  const r = await fetch(q);
   logDebug('token endpoint status='+r.status);
   if(!r.ok){
     auth.textContent='Login failed';
@@ -237,6 +251,21 @@ async function loginAs(userId, tenantId='default'){
   auth.textContent=`Logged in as ${authUser}`;
   logDebug('login ok as '+authUser);
 }
+
+document.getElementById('sendCode').addEventListener('click', async function(){
+  var phone = (document.getElementById('phone').value || '').trim();
+  if(!phone){
+    logDebug('phone is required');
+    return;
+  }
+  const r = await fetch(`/api/v1/auth/phone/send-code?phone_e164=${encodeURIComponent(phone)}`, {method:'POST'});
+  const j = await r.json();
+  logDebug('send-code status='+r.status+' provider='+(j.provider||'n/a'));
+  if(j.dev_code){
+    document.getElementById('otp').value = j.dev_code;
+    logDebug('dev_code auto-filled for local testing');
+  }
+});
 
 async function refreshAuthFromCookieOrStorage(){
   try{
@@ -340,7 +369,10 @@ async function run(path){
   try {
     const b = await fetch('/api/v1/billing/me', {headers:{'Authorization':`Bearer ${authToken}`}}).then(x=>x.json());
     const a = b.account;
-    billing.textContent = `User=${authUser} | Plan=${a.plan_id} | Remaining invoices=${a.remaining_invoices}/${a.invoice_limit}`;
+    const t = a.trial || {};
+    const p = a.plan || {};
+    const top = a.topup || {};
+    billing.textContent = `User=${authUser} | Plan=${a.plan_id} | Remaining=${a.remaining_invoices} | Trial=${t.remaining_invoices||0}/${t.invoice_limit||0} | Plan=${p.remaining_invoices||0}/${p.invoice_limit||0} | Topup=${top.remaining_invoices||0}`;
   } catch (e) {}
 }
 document.getElementById('runBatch').onclick=function(){ run('/api/v1/extract-and-map/batch/multi'); };

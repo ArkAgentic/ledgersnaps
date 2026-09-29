@@ -127,6 +127,16 @@ def test_send_code_endpoint_returns_dev_code_in_dev_mode():
     assert isinstance(body.get("dev_code"), str) and len(body["dev_code"]) == 6
 
 
+def test_playground_contains_phone_otp_controls():
+    r = client.get("/")
+    assert r.status_code == 200
+    html = r.text
+    assert "id='phone'" in html
+    assert "id='otp'" in html
+    assert "id='sendCode'" in html
+    assert "/api/v1/auth/phone/send-code" in html
+
+
 def test_auth_dev_token_sets_cookie_and_auth_me_works_with_cookie_only():
     t = client.get("/api/v1/auth/dev-token?user_id=user-cookie&tenant_id=t-cookie")
     assert t.status_code == 200
