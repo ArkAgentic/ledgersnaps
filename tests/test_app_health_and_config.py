@@ -205,6 +205,24 @@ def test_xero_draft_requires_connected_account():
     assert r.status_code in {400, 502}
 
 
+def test_xero_autofill_draft_payload_min_fields():
+    from app.main import _autofill_xero_draft_payload
+
+    p = {
+        "Type": "ACCPAY",
+        "Contact": {"Name": "Test Supplier"},
+        "Status": "DRAFT",
+        "Date": "2026-09-29",
+        "CurrencyCode": "AUD",
+        "LineItems": [{"Description": "Line 1"}],
+    }
+    out = _autofill_xero_draft_payload(p)
+    assert out.get("LineAmountTypes") == "Exclusive"
+    assert out.get("DueDate")
+    assert out.get("InvoiceNumber")
+    assert out["LineItems"][0].get("AccountCode")
+
+
 def test_auth_dev_token_sets_cookie_and_auth_me_works_with_cookie_only():
     t = client.get("/api/v1/auth/dev-token?user_id=user-cookie&tenant_id=t-cookie")
     assert t.status_code == 200

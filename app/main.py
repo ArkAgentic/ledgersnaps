@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 from typing import Optional
@@ -70,6 +71,38 @@ def _raise_invoice_limit_exceeded(estimated: int, max_invoices: int = 20) -> Non
             f"Please upload at most {max_invoices} invoices/bills per run."
         ),
     )
+
+
+def _autofill_xero_draft_payload(payload: dict) -> dict:
+    """Autofill minimal Xero-required fields to reduce draft upload failures."""
+    out = dict(payload)
+
+    if not out.get("LineAmountTypes"):
+        out["LineAmountTypes"] = "Exclusive"
+
+    inv_date = out.get("Date")
+    if not inv_date:
+        inv_date = date.today().isoformat()
+        out["Date"] = inv_date
+
+    if not out.get("DueDate"):
+        try:
+            d = datetime.strptime(str(inv_date), "%Y-%m-%d").date()
+            out["DueDate"] = (d + timedelta(days=14)).isoformat()
+        except Exception:
+            out["DueDate"] = (date.today() + timedelta(days=14)).isoformat()
+
+    if not out.get("InvoiceNumber"):
+        out["InvoiceNumber"] = f"LS-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+
+    default_account = os.getenv("XERO_DEFAULT_ACCOUNT_CODE", "400").strip() or "400"
+    line_items = out.get("LineItems") or []
+    if isinstance(line_items, list):
+        for li in line_items:
+            if isinstance(li, dict) and not li.get("AccountCode"):
+                li["AccountCode"] = default_account
+    out["LineItems"] = line_items
+    return out
 
 
 def _estimate_invoices_from_upload(filename: str, content_type: str, file_bytes: bytes) -> int:
@@ -844,14 +877,18 @@ async def xero_create_draft(
         raise HTTPException(status_code=400, detail="target_must_be_xero")
 
     mapped = await _extract_and_map_core(target="xero", flow_mode=flow_mode, file=file)
-    if not mapped.xero_ready:
+
+    # Autofill to make payload xero-ready when possible
+    draft_payload = _autofill_xero_draft_payload(mapped.draft_payload)
+    xero_ready, missing_required_fields, _ = validate_xero_draft_payload(draft_payload)
+    if not xero_ready:
         raise HTTPException(status_code=400, detail={
             "error": "xero_payload_not_ready",
-            "missing_required_fields": mapped.missing_required_fields,
+            "missing_required_fields": missing_required_fields,
             "validation_warnings": mapped.validation_warnings,
         })
     try:
-        xero_resp = await create_draft_invoice(user_id=user.user_id, draft_payload=mapped.draft_payload)
+        xero_resp = await create_draft_invoice(user_id=user.user_id, draft_payload=draft_payload)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {
