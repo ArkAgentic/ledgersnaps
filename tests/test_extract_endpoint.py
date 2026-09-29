@@ -251,6 +251,12 @@ def test_multifile_export_xlsx_endpoint():
     assert resp.status_code in {200, 502}
     if resp.status_code == 200:
         assert resp.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        wb = load_workbook(BytesIO(resp.content), data_only=True)
+        assert "summary" in wb.sheetnames
+        assert "xero_draft" in wb.sheetnames
 
 
 def test_multifile_export_xlsx_count_mismatch_returns_400():

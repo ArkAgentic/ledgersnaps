@@ -241,6 +241,53 @@ def build_multifile_extraction_workbook(batch: MultiFileBatchResponse) -> bytes:
                 ]
             )
 
+    # Sheet2: xero_draft (for debug/review of payload intended for Xero upload)
+    ws_xero = wb.create_sheet("xero_draft")
+    ws_xero.append(
+        [
+            "filename",
+            "chunk_index",
+            "target",
+            "xero_ready",
+            "missing_required_fields",
+            "validation_warnings",
+            "xero_upload_payload",
+        ]
+    )
+    for c in ws_xero[1]:
+        c.font = Font(bold=True)
+
+    for item in batch.items:
+        if not item.ok or not item.batch_result:
+            ws_xero.append(
+                [
+                    item.file_name,
+                    "",
+                    "xero",
+                    False,
+                    "file_failed",
+                    item.error or "unknown error",
+                    "",
+                ]
+            )
+            continue
+
+        for chunk in item.batch_result.chunks:
+            r = chunk.result
+            # What we send to Xero Invoices API is: {"Invoices": [draft_payload]}
+            upload_payload = {"Invoices": [r.draft_payload]}
+            ws_xero.append(
+                [
+                    item.file_name,
+                    chunk.chunk_index,
+                    r.target,
+                    bool(r.xero_ready),
+                    " | ".join(r.missing_required_fields),
+                    " | ".join(r.validation_warnings),
+                    json.dumps(upload_payload, ensure_ascii=False),
+                ]
+            )
+
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()

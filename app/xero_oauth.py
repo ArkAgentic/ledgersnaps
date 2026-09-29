@@ -42,7 +42,8 @@ def _redirect_uri() -> str:
 
 
 def _default_scope() -> str:
-    return os.getenv("XERO_SCOPE", "openid profile email accounting.transactions accounting.contacts offline_access").strip()
+    # Use new granular accounting scopes (accounting.transactions is deprecated).
+    return os.getenv("XERO_SCOPE", "offline_access accounting.invoices accounting.contacts").strip()
 
 
 def _basic_auth_header() -> str:
