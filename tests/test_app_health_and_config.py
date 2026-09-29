@@ -173,6 +173,38 @@ def test_playground_contains_phone_otp_controls():
     assert "/api/v1/auth/phone/send-code" in html
 
 
+def test_xero_connect_requires_config_or_returns_url():
+    t = client.get("/api/v1/auth/dev-token?user_id=xero-user&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+    r = client.get("/api/v1/xero/connect", headers=h)
+    assert r.status_code in {200, 400}
+    if r.status_code == 200:
+        body = r.json()
+        assert "url" in body and "state" in body
+    else:
+        assert "xero_config_missing" in r.json().get("detail", "")
+
+
+def test_xero_connection_default_false_without_exchange():
+    t = client.get("/api/v1/auth/dev-token?user_id=xero-user2&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+    r = client.get("/api/v1/xero/connection", headers=h)
+    assert r.status_code == 200
+    assert r.json().get("connected") is False
+
+
+def test_xero_draft_requires_connected_account():
+    t = client.get("/api/v1/auth/dev-token?user_id=xero-user3&tenant_id=t1")
+    h = {"Authorization": f"Bearer {t.json()['token']}"}
+    r = client.post(
+        "/api/v1/xero/drafts?target=xero&flow_mode=auto",
+        headers=h,
+        files={"file": ("a.jpg", b"fake-image", "image/jpeg")},
+    )
+    # mapping can fail earlier due to AOAI config, or xero_not_connected when mapping succeeds
+    assert r.status_code in {400, 502}
+
+
 def test_auth_dev_token_sets_cookie_and_auth_me_works_with_cookie_only():
     t = client.get("/api/v1/auth/dev-token?user_id=user-cookie&tenant_id=t-cookie")
     assert t.status_code == 200

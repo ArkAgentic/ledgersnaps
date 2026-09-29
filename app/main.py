@@ -38,6 +38,7 @@ from .store import create_job, get_job_owned, get_job_result_owned, list_jobs_ow
 from .store import list_queue_counts
 from .validators import validate_pdf_bytes
 from .xero_mapper import to_xero_accpay_draft
+from .xero_oauth import build_connect_url, create_draft_invoice, exchange_code, get_connection_status
 from .xero_payload_validator import validate_xero_draft_payload
 
 app = FastAPI(title="LedgerSnaps API", version="0.4.1")
@@ -790,6 +791,75 @@ async def compliance_abn_lookup(name: str = Query(..., min_length=2)) -> dict:
     """按公司名实时查询 ABR 候选（用于 Step A 补全 ABN）。"""
     result = await abr_lookup_by_name(name)
     return result
+
+
+@app.get("/api/v1/xero/connect")
+async def xero_connect(user: CurrentUser = Depends(_current_user)) -> dict:
+    try:
+        out = build_connect_url(user_id=user.user_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return out
+
+
+@app.get("/callback")
+async def xero_callback(code: Optional[str] = None, state: Optional[str] = None) -> dict:
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="xero_callback_missing_code_or_state")
+    try:
+        out = await exchange_code(code=code, state=state)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, **out}
+
+
+@app.post("/api/v1/xero/token/exchange")
+async def xero_token_exchange(
+    code: str = Query(..., min_length=1),
+    state: str = Query(..., min_length=1),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    try:
+        out = await exchange_code(code=code, state=state)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if out.get("user_id") != user.user_id:
+        raise HTTPException(status_code=403, detail="xero_state_user_mismatch")
+    return {"ok": True, **out}
+
+
+@app.get("/api/v1/xero/connection")
+async def xero_connection(user: CurrentUser = Depends(_current_user)) -> dict:
+    return get_connection_status(user_id=user.user_id)
+
+
+@app.post("/api/v1/xero/drafts")
+async def xero_create_draft(
+    target: Literal["xero", "myob"] = Query("xero"),
+    flow_mode: Literal["auto", "ap", "ar"] = Query("auto"),
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    if target != "xero":
+        raise HTTPException(status_code=400, detail="target_must_be_xero")
+
+    mapped = await _extract_and_map_core(target="xero", flow_mode=flow_mode, file=file)
+    if not mapped.xero_ready:
+        raise HTTPException(status_code=400, detail={
+            "error": "xero_payload_not_ready",
+            "missing_required_fields": mapped.missing_required_fields,
+            "validation_warnings": mapped.validation_warnings,
+        })
+    try:
+        xero_resp = await create_draft_invoice(user_id=user.user_id, draft_payload=mapped.draft_payload)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {
+        "ok": True,
+        "target": "xero",
+        "xero": xero_resp,
+        "invoice": mapped.invoice.model_dump(),
+    }
 
 
 @app.post("/api/v1/jobs")

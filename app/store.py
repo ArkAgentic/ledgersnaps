@@ -113,6 +113,21 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS xero_connections (
+              user_id TEXT PRIMARY KEY,
+              tenant_id TEXT NOT NULL,
+              access_token TEXT NOT NULL,
+              refresh_token TEXT NOT NULL,
+              token_type TEXT,
+              scope TEXT,
+              expires_at TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
@@ -569,9 +584,56 @@ def ip_already_registered(signup_ip: str) -> bool:
     return cur.fetchone() is not None
 
 
+def upsert_xero_connection(
+    user_id: str,
+    *,
+    tenant_id: str,
+    access_token: str,
+    refresh_token: str,
+    token_type: Optional[str],
+    scope: Optional[str],
+    expires_at: str,
+) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO xero_connections(user_id, tenant_id, access_token, refresh_token, token_type, scope, expires_at, created_at, updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              tenant_id=excluded.tenant_id,
+              access_token=excluded.access_token,
+              refresh_token=excluded.refresh_token,
+              token_type=excluded.token_type,
+              scope=excluded.scope,
+              expires_at=excluded.expires_at,
+              updated_at=excluded.updated_at
+            """,
+            (user_id, tenant_id, access_token, refresh_token, token_type, scope, expires_at, now, now),
+        )
+        conn.commit()
+
+
+def get_xero_connection(user_id: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT user_id, tenant_id, access_token, refresh_token, token_type, scope, expires_at, created_at, updated_at
+        FROM xero_connections
+        WHERE user_id=?
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
+        conn.execute("DELETE FROM xero_connections")
         conn.execute("DELETE FROM users")
         conn.execute("DELETE FROM user_entitlements")
         conn.execute("DELETE FROM job_queue")
