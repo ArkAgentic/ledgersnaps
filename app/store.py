@@ -86,6 +86,21 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_entitlements (
+              user_id TEXT PRIMARY KEY,
+              phone_e164 TEXT,
+              phone_hash TEXT,
+              device_fingerprint TEXT,
+              signup_ip TEXT,
+              trial_granted INTEGER NOT NULL DEFAULT 0,
+              granted_at TEXT,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_entitlements_phone_hash_unique ON user_entitlements(phone_hash)")
         cols = {r[1] for r in conn.execute("PRAGMA table_info(job_queue)").fetchall()}
         if "last_error" not in cols:
             conn.execute("ALTER TABLE job_queue ADD COLUMN last_error TEXT")
@@ -97,6 +112,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_status ON jobs(tenant_id, user_id, status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_job_results_owner ON job_results(tenant_id, user_id, updated_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_job_queue_status_available ON job_queue(status, available_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_user_entitlements_trial ON user_entitlements(trial_granted, updated_at DESC)")
         conn.commit()
     if _CONN is None:
         conn.close()
@@ -445,9 +461,60 @@ def get_job_owned(tenant_id: str, user_id: str, job_id: str) -> Optional[dict[st
     return dict(row) if row else None
 
 
+def upsert_user_entitlement(
+    user_id: str,
+    *,
+    phone_e164: Optional[str],
+    phone_hash: Optional[str],
+    device_fingerprint: Optional[str],
+    signup_ip: Optional[str],
+    trial_granted: bool,
+) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO user_entitlements(
+              user_id, phone_e164, phone_hash, device_fingerprint, signup_ip, trial_granted, granted_at, updated_at
+            )
+            VALUES(?,?,?,?,?,?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              phone_e164=excluded.phone_e164,
+              phone_hash=excluded.phone_hash,
+              device_fingerprint=excluded.device_fingerprint,
+              signup_ip=excluded.signup_ip,
+              trial_granted=excluded.trial_granted,
+              granted_at=CASE WHEN user_entitlements.granted_at IS NULL THEN excluded.granted_at ELSE user_entitlements.granted_at END,
+              updated_at=excluded.updated_at
+            """,
+            (
+                user_id,
+                phone_e164,
+                phone_hash,
+                device_fingerprint,
+                signup_ip,
+                1 if trial_granted else 0,
+                now if trial_granted else None,
+                now,
+            ),
+        )
+        conn.commit()
+
+
+def has_trial_claim_for_phone_hash(phone_hash: str) -> bool:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        "SELECT 1 FROM user_entitlements WHERE phone_hash=? AND trial_granted=1 LIMIT 1",
+        (phone_hash,),
+    )
+    return cur.fetchone() is not None
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
+        conn.execute("DELETE FROM user_entitlements")
         conn.execute("DELETE FROM job_queue")
         conn.execute("DELETE FROM job_results")
         conn.execute("DELETE FROM jobs")

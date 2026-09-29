@@ -5,7 +5,7 @@ from typing import Literal
 from typing import Optional
 from typing import cast
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse, Response
 
@@ -18,6 +18,7 @@ from .flow import classify_document_flow
 from .llm import parse_invoice_with_azure_openai
 from .myob_mapper import to_myob_draft_bill
 from .queue_backend import QueueBackend, QueueMessage
+from .risk_control import check_trial_eligibility, record_trial_claim
 from .rules import extract_invoice_rules
 from .schemas import (
     BatchExtractAndMapResponse,
@@ -640,9 +641,30 @@ async def _extract_and_map_batch_core(
 
 @app.get("/api/v1/auth/dev-token")
 async def auth_dev_token(
+    request: Request,
     user_id: str = Query(..., min_length=1),
     tenant_id: str = Query("default", min_length=1),
+    phone_e164: Optional[str] = Query(None),
+    phone_otp_code: Optional[str] = Query(None),
+    device_fingerprint: Optional[str] = Query(None),
 ) -> Response:
+    # Trial entitlement gate (phone-bound). In dev mode OTP uses fixed code 123456.
+    if phone_e164:
+        if phone_otp_code != "123456":
+            raise HTTPException(status_code=400, detail="phone_verification_required")
+        try:
+            check = check_trial_eligibility(phone_e164)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if not check.eligible:
+            raise HTTPException(status_code=403, detail=check.reason)
+        record_trial_claim(
+            user_id,
+            phone_e164=phone_e164,
+            device_fingerprint=device_fingerprint,
+            signup_ip=(request.client.host if request and request.client else None),
+        )
+
     token = issue_dev_token(user_id=user_id, tenant_id=tenant_id)
     body = {"token": token, "token_type": "bearer", "user_id": user_id, "tenant_id": tenant_id}
     resp = Response(
