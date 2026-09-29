@@ -89,13 +89,13 @@ def test_trial_claim_requires_phone_otp_and_blocks_phone_reuse():
     code = s1.json().get("dev_code")
     assert code
     r1 = client.get(
-        f"/api/v1/auth/dev-token?user_id=p1&tenant_id=t1&phone_e164=%2B61400111222&phone_otp_code={code}&device_fingerprint=d1"
+        f"/api/v1/auth/dev-token?user_id=p1&tenant_id=t1&email=p1%40example.com&full_name=Person%201&phone_e164=%2B61400111222&phone_otp_code={code}&device_fingerprint=d1"
     )
     assert r1.status_code == 200
 
     # same phone should not be able to claim trial again for another account
     r2 = client.get(
-        f"/api/v1/auth/dev-token?user_id=p2&tenant_id=t1&phone_e164=%2B61400111222&phone_otp_code={code}&device_fingerprint=d2"
+        f"/api/v1/auth/dev-token?user_id=p2&tenant_id=t1&email=p2%40example.com&full_name=Person%202&phone_e164=%2B61400111222&phone_otp_code={code}&device_fingerprint=d2"
     )
     assert r2.status_code == 403
     assert r2.json()["detail"] == "trial_already_claimed_for_phone"
@@ -123,17 +123,35 @@ def test_ip_can_only_register_once():
     s1 = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61411111111")
     c1 = s1.json()["dev_code"]
     r1 = client.get(
-        f"/api/v1/auth/dev-token?user_id=ip-a&tenant_id=t1&email=a%40example.com&full_name=A&phone_e164=%2B61411111111&phone_otp_code={c1}&device_fingerprint=d1"
+        f"/api/v1/auth/dev-token?user_id=ip-a&tenant_id=t1&email=a%40example.com&full_name=Alice&phone_e164=%2B61411111111&phone_otp_code={c1}&device_fingerprint=d1"
     )
     assert r1.status_code == 200
 
     s2 = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61422222222")
     c2 = s2.json()["dev_code"]
     r2 = client.get(
-        f"/api/v1/auth/dev-token?user_id=ip-b&tenant_id=t1&email=b%40example.com&full_name=B&phone_e164=%2B61422222222&phone_otp_code={c2}&device_fingerprint=d2"
+        f"/api/v1/auth/dev-token?user_id=ip-b&tenant_id=t1&email=b%40example.com&full_name=Bob&phone_e164=%2B61422222222&phone_otp_code={c2}&device_fingerprint=d2"
     )
     assert r2.status_code == 403
     assert r2.json()["detail"] == "ip_already_registered"
+
+
+def test_registration_requires_email_phone_full_name():
+    reset_all_jobs_for_tests()
+    s = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61433333333")
+    code = s.json()["dev_code"]
+
+    no_email = client.get(
+        f"/api/v1/auth/dev-token?user_id=u-no-email&tenant_id=t1&full_name=Alice&phone_e164=%2B61433333333&phone_otp_code={code}"
+    )
+    assert no_email.status_code == 403
+    assert no_email.json()["detail"] == "email_required"
+
+    no_name = client.get(
+        f"/api/v1/auth/dev-token?user_id=u-no-name&tenant_id=t1&email=a%40example.com&phone_e164=%2B61433333333&phone_otp_code={code}"
+    )
+    assert no_name.status_code == 403
+    assert no_name.json()["detail"] == "full_name_required"
 
 
 def test_send_code_endpoint_returns_dev_code_in_dev_mode():

@@ -104,9 +104,9 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS users (
               user_id TEXT PRIMARY KEY,
-              email TEXT,
-              phone_e164 TEXT,
-              full_name TEXT,
+              email TEXT NOT NULL,
+              phone_e164 TEXT NOT NULL,
+              full_name TEXT NOT NULL,
               signup_ip TEXT,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL
@@ -537,19 +537,28 @@ def upsert_user_profile(
 ) -> None:
     conn = _ensure_conn()
     now = _now_iso()
+    e = (email or "").strip()
+    p = (phone_e164 or "").strip()
+    n = (full_name or "").strip()
+    if not e:
+        raise ValueError("email_required")
+    if not p:
+        raise ValueError("phone_required")
+    if not n:
+        raise ValueError("full_name_required")
     with _DB_LOCK:
         conn.execute(
             """
             INSERT INTO users(user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at)
             VALUES(?,?,?,?,?,?,?)
             ON CONFLICT(user_id) DO UPDATE SET
-              email=COALESCE(excluded.email, users.email),
-              phone_e164=COALESCE(excluded.phone_e164, users.phone_e164),
-              full_name=COALESCE(excluded.full_name, users.full_name),
+              email=excluded.email,
+              phone_e164=excluded.phone_e164,
+              full_name=excluded.full_name,
               signup_ip=COALESCE(excluded.signup_ip, users.signup_ip),
               updated_at=excluded.updated_at
             """,
-            (user_id, email, phone_e164, full_name, signup_ip, now, now),
+            (user_id, e, p, n, signup_ip, now, now),
         )
         conn.commit()
 
