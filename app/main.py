@@ -17,8 +17,9 @@ from .exporter import build_multifile_extraction_workbook
 from .flow import classify_document_flow
 from .llm import parse_invoice_with_azure_openai
 from .myob_mapper import to_myob_draft_bill
+from .otp import otp_provider
 from .queue_backend import QueueBackend, QueueMessage
-from .risk_control import check_trial_eligibility, record_trial_claim
+from .risk_control import check_trial_eligibility, record_trial_claim, validate_phone_e164
 from .rules import extract_invoice_rules
 from .schemas import (
     BatchExtractAndMapResponse,
@@ -650,7 +651,11 @@ async def auth_dev_token(
 ) -> Response:
     # Trial entitlement gate (phone-bound). In dev mode OTP uses fixed code 123456.
     if phone_e164:
-        if phone_otp_code != "123456":
+        try:
+            _ = validate_phone_e164(phone_e164)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if not phone_otp_code or not otp_provider.verify_code(phone_e164, phone_otp_code):
             raise HTTPException(status_code=400, detail="phone_verification_required")
         try:
             check = check_trial_eligibility(phone_e164)
@@ -681,6 +686,17 @@ async def auth_dev_token(
         path="/",
     )
     return resp
+
+
+@app.post("/api/v1/auth/phone/send-code")
+async def auth_phone_send_code(phone_e164: str = Query(..., min_length=8)) -> dict:
+    try:
+        out = otp_provider.send_code(phone_e164)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    return out
 
 
 @app.get("/api/v1/billing/me")

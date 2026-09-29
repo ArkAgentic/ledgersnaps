@@ -84,14 +84,18 @@ def test_auth_dev_token_then_billing_me_with_bearer():
 
 def test_trial_claim_requires_phone_otp_and_blocks_phone_reuse():
     reset_all_jobs_for_tests()
+    s1 = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61400111222")
+    assert s1.status_code == 200
+    code = s1.json().get("dev_code")
+    assert code
     r1 = client.get(
-        "/api/v1/auth/dev-token?user_id=p1&tenant_id=t1&phone_e164=%2B61400111222&phone_otp_code=123456&device_fingerprint=d1"
+        f"/api/v1/auth/dev-token?user_id=p1&tenant_id=t1&phone_e164=%2B61400111222&phone_otp_code={code}&device_fingerprint=d1"
     )
     assert r1.status_code == 200
 
     # same phone should not be able to claim trial again for another account
     r2 = client.get(
-        "/api/v1/auth/dev-token?user_id=p2&tenant_id=t1&phone_e164=%2B61400111222&phone_otp_code=123456&device_fingerprint=d2"
+        f"/api/v1/auth/dev-token?user_id=p2&tenant_id=t1&phone_e164=%2B61400111222&phone_otp_code={code}&device_fingerprint=d2"
     )
     assert r2.status_code == 403
     assert r2.json()["detail"] == "trial_already_claimed_for_phone"
@@ -99,6 +103,8 @@ def test_trial_claim_requires_phone_otp_and_blocks_phone_reuse():
 
 def test_trial_claim_requires_valid_phone_and_code():
     reset_all_jobs_for_tests()
+    s = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61400999888")
+    assert s.status_code == 200
     bad_code = client.get(
         "/api/v1/auth/dev-token?user_id=p3&tenant_id=t1&phone_e164=%2B61400999888&phone_otp_code=000000"
     )
@@ -110,6 +116,15 @@ def test_trial_claim_requires_valid_phone_and_code():
     )
     assert bad_phone.status_code == 400
     assert bad_phone.json()["detail"] == "invalid_phone_e164"
+
+
+def test_send_code_endpoint_returns_dev_code_in_dev_mode():
+    r = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61400012345")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["provider"] == "dev"
+    assert isinstance(body.get("dev_code"), str) and len(body["dev_code"]) == 6
 
 
 def test_auth_dev_token_sets_cookie_and_auth_me_works_with_cookie_only():

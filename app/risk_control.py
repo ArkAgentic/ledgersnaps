@@ -24,6 +24,10 @@ def normalize_phone(phone: str) -> str:
     return p
 
 
+def validate_phone_e164(phone: str) -> str:
+    return normalize_phone(phone)
+
+
 def hash_phone(phone_e164: str) -> str:
     return hashlib.sha256(phone_e164.encode()).hexdigest()
 
