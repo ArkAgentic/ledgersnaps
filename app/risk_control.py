@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from .store import has_trial_claim_for_phone_hash, upsert_user_entitlement
+from .store import has_trial_claim_for_phone_hash, ip_already_registered, upsert_user_entitlement, upsert_user_profile
 
 E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
 
@@ -46,8 +46,21 @@ def record_trial_claim(
     phone_e164: str,
     device_fingerprint: Optional[str],
     signup_ip: Optional[str],
+    email: Optional[str] = None,
+    full_name: Optional[str] = None,
 ) -> None:
     norm = normalize_phone(phone_e164)
+    if signup_ip and ip_already_registered(signup_ip):
+        raise ValueError("ip_already_registered")
+
+    upsert_user_profile(
+        user_id,
+        email=(email or None),
+        phone_e164=norm,
+        full_name=(full_name or None),
+        signup_ip=(signup_ip or None),
+    )
+
     upsert_user_entitlement(
         user_id,
         phone_e164=norm,

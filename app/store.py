@@ -100,6 +100,22 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+              user_id TEXT PRIMARY KEY,
+              email TEXT,
+              phone_e164 TEXT,
+              full_name TEXT,
+              signup_ip TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_entitlements_phone_hash_unique ON user_entitlements(phone_hash)")
         cols = {r[1] for r in conn.execute("PRAGMA table_info(job_queue)").fetchall()}
         if "last_error" not in cols:
@@ -511,9 +527,43 @@ def has_trial_claim_for_phone_hash(phone_hash: str) -> bool:
     return cur.fetchone() is not None
 
 
+def upsert_user_profile(
+    user_id: str,
+    *,
+    email: Optional[str],
+    phone_e164: Optional[str],
+    full_name: Optional[str],
+    signup_ip: Optional[str],
+) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO users(user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at)
+            VALUES(?,?,?,?,?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              email=COALESCE(excluded.email, users.email),
+              phone_e164=COALESCE(excluded.phone_e164, users.phone_e164),
+              full_name=COALESCE(excluded.full_name, users.full_name),
+              signup_ip=COALESCE(excluded.signup_ip, users.signup_ip),
+              updated_at=excluded.updated_at
+            """,
+            (user_id, email, phone_e164, full_name, signup_ip, now, now),
+        )
+        conn.commit()
+
+
+def ip_already_registered(signup_ip: str) -> bool:
+    conn = _ensure_conn()
+    cur = conn.execute("SELECT 1 FROM users WHERE signup_ip=? LIMIT 1", (signup_ip,))
+    return cur.fetchone() is not None
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
+        conn.execute("DELETE FROM users")
         conn.execute("DELETE FROM user_entitlements")
         conn.execute("DELETE FROM job_queue")
         conn.execute("DELETE FROM job_results")

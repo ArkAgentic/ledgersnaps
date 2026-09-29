@@ -677,6 +677,8 @@ async def auth_dev_token(
     request: Request,
     user_id: str = Query(..., min_length=1),
     tenant_id: str = Query("default", min_length=1),
+    email: Optional[str] = Query(None),
+    full_name: Optional[str] = Query(None),
     phone_e164: Optional[str] = Query(None),
     phone_otp_code: Optional[str] = Query(None),
     device_fingerprint: Optional[str] = Query(None),
@@ -695,12 +697,17 @@ async def auth_dev_token(
             raise HTTPException(status_code=400, detail=str(e)) from e
         if not check.eligible:
             raise HTTPException(status_code=403, detail=check.reason)
-        record_trial_claim(
-            user_id,
-            phone_e164=phone_e164,
-            device_fingerprint=device_fingerprint,
-            signup_ip=(request.client.host if request and request.client else None),
-        )
+        try:
+            record_trial_claim(
+                user_id,
+                phone_e164=phone_e164,
+                device_fingerprint=device_fingerprint,
+                signup_ip=(request.client.host if request and request.client else None),
+                email=email,
+                full_name=full_name,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=403, detail=str(e)) from e
 
     token = issue_dev_token(user_id=user_id, tenant_id=tenant_id)
     body = {"token": token, "token_type": "bearer", "user_id": user_id, "tenant_id": tenant_id}
@@ -762,7 +769,11 @@ async def billing_topup(
     packs: int = Query(1, ge=1, le=20),
     user: CurrentUser = Depends(_current_user),
 ) -> dict:
-    # v1: pack grant endpoint (payment integration can call this after successful checkout)
+    # Top-up only allowed for paid plans (starter/pro)
+    acc = account_snapshot(user.user_id)
+    if acc.get("plan_id") not in {"starter_14_95", "pro_29_95"}:
+        raise HTTPException(status_code=403, detail="topup_requires_paid_plan")
+
     st = add_topup(user.user_id, packs=packs)
     return {
         "ok": True,

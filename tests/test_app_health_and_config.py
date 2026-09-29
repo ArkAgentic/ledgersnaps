@@ -118,6 +118,24 @@ def test_trial_claim_requires_valid_phone_and_code():
     assert bad_phone.json()["detail"] == "invalid_phone_e164"
 
 
+def test_ip_can_only_register_once():
+    reset_all_jobs_for_tests()
+    s1 = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61411111111")
+    c1 = s1.json()["dev_code"]
+    r1 = client.get(
+        f"/api/v1/auth/dev-token?user_id=ip-a&tenant_id=t1&email=a%40example.com&full_name=A&phone_e164=%2B61411111111&phone_otp_code={c1}&device_fingerprint=d1"
+    )
+    assert r1.status_code == 200
+
+    s2 = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61422222222")
+    c2 = s2.json()["dev_code"]
+    r2 = client.get(
+        f"/api/v1/auth/dev-token?user_id=ip-b&tenant_id=t1&email=b%40example.com&full_name=B&phone_e164=%2B61422222222&phone_otp_code={c2}&device_fingerprint=d2"
+    )
+    assert r2.status_code == 403
+    assert r2.json()["detail"] == "ip_already_registered"
+
+
 def test_send_code_endpoint_returns_dev_code_in_dev_mode():
     r = client.post("/api/v1/auth/phone/send-code?phone_e164=%2B61400012345")
     assert r.status_code == 200
@@ -433,6 +451,14 @@ def test_billing_trial_and_topup_plan_pricing_contract():
     assert p2.json()["account"]["price_aud"] == 29.95
     assert p2.json()["account"]["plan"]["invoice_limit"] == 300
 
+    # topup is blocked before paid plan
+    t2 = client.get("/api/v1/auth/dev-token?user_id=pricing-trial&tenant_id=t1")
+    h2 = {"Authorization": f"Bearer {t2.json()['token']}"}
+    tp_block = client.post("/api/v1/billing/topup?packs=1", headers=h2)
+    assert tp_block.status_code == 403
+    assert tp_block.json()["detail"] == "topup_requires_paid_plan"
+
+    # starter/pro can topup
     tp = client.post("/api/v1/billing/topup?packs=2", headers=h)
     assert tp.status_code == 200
     assert tp.json()["pack_size"] == 50
