@@ -75,10 +75,19 @@ async def abr_lookup_by_abn(abn: str) -> dict[str, Any]:
 
     url = (
         "https://abr.business.gov.au/json/AbnDetails.aspx?"
-        f"abn={quote_plus(abn)}&callback=cb&authenticationGuid={quote_plus(guid)}"
+        f"abn={quote_plus(abn)}&callback=cb&guid={quote_plus(guid)}"
     )
     try:
         data = await _abr_get_json(url)
+        msg = str(data.get("Message") or "").strip()
+        if msg and "not recognised as a Registered Party" in msg:
+            return {
+                "available": False,
+                "method": "abn",
+                "reason": "abr_guid_not_registered",
+                "message": msg,
+                "raw": data,
+            }
         return {
             "available": True,
             "method": "abn",
@@ -86,6 +95,7 @@ async def abr_lookup_by_abn(abn: str) -> dict[str, Any]:
             "entity_name": data.get("EntityName") or data.get("MainName") or "",
             "abn_status": data.get("AbnStatus") or "",
             "gst_registered": bool(data.get("Gst") or data.get("GstRegistered") or False),
+            "message": msg,
             "raw": data,
         }
     except Exception as e:  # noqa: BLE001
@@ -100,13 +110,34 @@ async def abr_lookup_by_name(name: str) -> dict[str, Any]:
 
     url = (
         "https://abr.business.gov.au/json/MatchingNames.aspx?"
-        f"name={quote_plus(name)}&maxResults=5&callback=cb&authenticationGuid={quote_plus(guid)}"
+        f"name={quote_plus(name)}"
+        "&postcode="
+        "&legalName=Y&tradingName=Y"
+        "&NSW=Y&SA=Y&ACT=Y&VIC=Y&WA=Y&NT=Y&QLD=Y&TAS=Y"
+        "&maxResults=10"
+        f"&callback=cb&guid={quote_plus(guid)}"
     )
     try:
         data = await _abr_get_json(url)
+        msg = str(data.get("Message") or "").strip()
+        if msg and "not recognised as a Registered Party" in msg:
+            return {
+                "available": False,
+                "method": "name",
+                "matched": False,
+                "reason": "abr_guid_not_registered",
+                "message": msg,
+                "raw": data,
+            }
         names = data.get("Names") or data.get("names") or []
         if not names:
-            return {"available": True, "method": "name", "matched": False, "reason": "no ABR candidates"}
+            return {
+                "available": True,
+                "method": "name",
+                "matched": False,
+                "reason": "no ABR candidates",
+                "message": msg,
+            }
         c = names[0]
         candidate_abn = normalize_abn(str(c.get("Abn") or c.get("abn") or ""))
         candidate_name = str(c.get("Name") or c.get("name") or "")

@@ -6,6 +6,7 @@ from app.main import app
 from app.store import get_queue_item, get_job_owned, reset_all_jobs_for_tests
 from app.storage_backend import artifact_exists_local
 from app.worker import process_claimed_item, process_one_queued_job
+from app import abn as abn_mod
 
 
 client = TestClient(app)
@@ -221,6 +222,36 @@ def test_xero_autofill_draft_payload_min_fields():
     assert out.get("DueDate")
     assert out.get("InvoiceNumber")
     assert out["LineItems"][0].get("AccountCode")
+
+
+def test_abr_lookup_by_name_surfaces_unregistered_guid(monkeypatch):
+    monkeypatch.setenv("ABR_GUID", "dummy-guid")
+
+    async def _fake(_url: str):
+        return {"Message": "The GUID entered is not recognised as a Registered Party", "Names": []}
+
+    monkeypatch.setattr(abn_mod, "_abr_get_json", _fake)
+
+    import asyncio
+
+    out = asyncio.run(abn_mod.abr_lookup_by_name("Telstra"))
+    assert out["available"] is False
+    assert out["reason"] == "abr_guid_not_registered"
+
+
+def test_abr_lookup_by_abn_surfaces_unregistered_guid(monkeypatch):
+    monkeypatch.setenv("ABR_GUID", "dummy-guid")
+
+    async def _fake(_url: str):
+        return {"Message": "The GUID entered is not recognised as a Registered Party", "Abn": ""}
+
+    monkeypatch.setattr(abn_mod, "_abr_get_json", _fake)
+
+    import asyncio
+
+    out = asyncio.run(abn_mod.abr_lookup_by_abn("33051775556"))
+    assert out["available"] is False
+    assert out["reason"] == "abr_guid_not_registered"
 
 
 def test_auth_dev_token_sets_cookie_and_auth_me_works_with_cookie_only():

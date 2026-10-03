@@ -100,6 +100,11 @@ class ExtractAndMapResponse(BaseModel):
     xero_ready: Optional[bool] = None
     missing_required_fields: List[str] = Field(default_factory=list)
     suggested_fixes: List[str] = Field(default_factory=list)
+    abr_available: Optional[bool] = None
+    abr_abn: Optional[str] = None
+    abr_entity_name: Optional[str] = None
+    abr_gst_registered: Optional[bool] = None
+    abr_reason: Optional[str] = None
     validation_warnings: List[str] = Field(default_factory=list)
     model: str
     meta: ExtractionMeta

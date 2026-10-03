@@ -113,6 +113,10 @@ def test_export_xlsx_compulsory_sheet_exists_and_has_target_fields_when_success(
     if resp.status_code == 200:
         wb = load_workbook(BytesIO(resp.content))
         assert "summary" in wb.sheetnames
+        ws = wb["summary"]
+        headers = [c.value for c in ws[1]]
+        assert "abr_available" in headers
+        assert "abr_gst_registered" in headers
 
 
 def test_abn_lookup_endpoint_without_guid_returns_unavailable():
@@ -257,6 +261,10 @@ def test_multifile_export_xlsx_endpoint():
         wb = load_workbook(BytesIO(resp.content), data_only=True)
         assert "summary" in wb.sheetnames
         assert "xero_draft" in wb.sheetnames
+        ws = wb["summary"]
+        headers = [c.value for c in ws[1]]
+        assert "abr_abn" in headers
+        assert "abr_gst_registered" in headers
 
 
 def test_multifile_export_xlsx_count_mismatch_returns_400():
