@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-  AZURE_CONTAINER_APP_NAME: ${{ secrets.AZURE_CONTAINER_APP_NAME }}
-  AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-  AZURE_CONTAINER_REGISTRY_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY_NAME }}
+  AZURE_RESOURCE_GROUP: resource-group-ledgersnaps-production-application-australiaeast-001
+  AZURE_CONTAINER_APP_NAME: ca-ledgersnaps-api-aue-002
+  AZURE_CONTAINER_REGISTRY: acrledgersnapsaue001.azurecr.io
+  AZURE_CONTAINER_REGISTRY_NAME: acrledgersnapsaue001
   IMAGE_NAME: ledgersnaps-api
 
 jobs:
