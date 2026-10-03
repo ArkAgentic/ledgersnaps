@@ -34,7 +34,10 @@ jobs:
         run: az version
 
       - name: ACR login
-        run: az acr login --name "$AZURE_CONTAINER_REGISTRY_NAME"
+        run: |
+          set -euo pipefail
+          TOKEN=$(az acr login --name "$AZURE_CONTAINER_REGISTRY_NAME" --expose-token --output tsv --query accessToken)
+          echo "$TOKEN" | docker login "$AZURE_CONTAINER_REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
 
       - name: Build and push image
         run: |
