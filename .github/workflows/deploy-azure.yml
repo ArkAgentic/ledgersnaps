@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_RESOURCE_GROUP: resource-group-ledgersnaps-production-application-australiaeast-001
+  AZURE_RESOURCE_GROUP: LedgerSnapsProductionApplicationAustraliaEast
   AZURE_CONTAINER_APP_NAME: ca-ledgersnaps-api-aue
   AZURE_CONTAINER_REGISTRY: acrledgersnapsaue001.azurecr.io
   AZURE_CONTAINER_REGISTRY_NAME: acrledgersnapsaue001
