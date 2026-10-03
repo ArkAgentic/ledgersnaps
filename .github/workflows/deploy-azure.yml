@@ -36,14 +36,13 @@ jobs:
       - name: ACR login
         run: |
           set -euo pipefail
-          TOKEN=$(az acr login --name "$AZURE_CONTAINER_REGISTRY_NAME" --expose-token --output tsv --query accessToken)
-          echo "$TOKEN" | docker login "$AZURE_CONTAINER_REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          az acr login --name acrledgersnapsaue001
 
       - name: Build and push image
         run: |
           set -euo pipefail
           TAG="${GITHUB_SHA::7}"
-          IMAGE="$AZURE_CONTAINER_REGISTRY/$IMAGE_NAME:$TAG"
+          IMAGE="acrledgersnapsaue001.azurecr.io/$IMAGE_NAME:$TAG"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
