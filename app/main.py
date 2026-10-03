@@ -884,11 +884,18 @@ async def xero_token_exchange(
 
 @app.get("/api/v1/xero/connection")
 async def xero_connection(user: CurrentUser = Depends(_current_user)) -> dict:
+    # UI bootstrap endpoint for Xero status card:
+    # - connected flag
+    # - active tenant
+    # - selectable tenant list (when available)
+    # This is used before rendering "Upload to Xero" actions.
     return await get_connection_status_live(user_id=user.user_id)
 
 
 @app.post("/api/v1/xero/disconnect")
 async def xero_disconnect(user: CurrentUser = Depends(_current_user)) -> dict:
+    # Explicit account reset for "Switch Xero account" UX:
+    # frontend should call this before starting a new /xero/connect flow.
     delete_xero_connection(user.user_id)
     return {"ok": True, "connected": False}
 
@@ -898,6 +905,8 @@ async def xero_switch_tenant(
     tenant_id: str = Query(..., min_length=1),
     user: CurrentUser = Depends(_current_user),
 ) -> dict:
+    # Company switch within the SAME Xero login.
+    # This avoids re-auth when user only wants a different tenant/org.
     try:
         out = set_active_tenant(user_id=user.user_id, tenant_id=tenant_id)
     except RuntimeError as e:
@@ -917,7 +926,8 @@ async def xero_create_draft(
 
     mapped = await _extract_and_map_core(target="xero", flow_mode=flow_mode, file=file)
 
-    # Autofill to make payload xero-ready when possible
+    # Autofill missing required Xero fields so "one-click upload" succeeds
+    # for common invoices without manual data entry.
     draft_payload = _autofill_xero_draft_payload(mapped.draft_payload)
     xero_ready, missing_required_fields, _ = validate_xero_draft_payload(draft_payload)
     if not xero_ready:
@@ -931,6 +941,10 @@ async def xero_create_draft(
     except RuntimeError as e:
         msg = str(e)
         if msg.startswith("xero_not_connected"):
+            # Frontend behavior contract:
+            # 1) show modal "Authorize with Xero"
+            # 2) open detail.connect.url in popup/new tab
+            # 3) after callback success, retry same upload automatically
             try:
                 connect = build_connect_url(user_id=user.user_id)
             except Exception:
@@ -944,6 +958,7 @@ async def xero_create_draft(
                 },
             ) from e
         if msg.startswith("xero_token_refresh_failed"):
+            # Session expired and refresh failed -> force full re-auth.
             try:
                 connect = build_connect_url(user_id=user.user_id)
             except Exception:

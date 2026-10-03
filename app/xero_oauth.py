@@ -163,6 +163,9 @@ def _is_expiring_soon(expires_at_iso: Optional[str], seconds: int = 120) -> bool
 
 
 async def _refresh_access_token_if_needed(*, user_id: str, force: bool = False) -> dict[str, Any]:
+    # Central token lifecycle guard used by ALL write paths.
+    # If token is close to expiry, refresh first so front-end upload buttons
+    # remain "single click" instead of randomly failing with 401 mid-action.
     row = get_xero_connection(user_id)
     if not row:
         raise RuntimeError("xero_not_connected")
@@ -233,6 +236,8 @@ async def _list_connections_with_access_token(access_token: str) -> list[dict[st
 
 
 async def get_connection_status_live(*, user_id: str) -> dict[str, Any]:
+    # Read endpoint for frontend connection panel. Returns active tenant and
+    # selectable tenant list so UI can render a company switcher.
     row = get_xero_connection(user_id)
     if not row:
         return {"connected": False}
@@ -252,6 +257,8 @@ async def get_connection_status_live(*, user_id: str) -> dict[str, Any]:
 
 
 def set_active_tenant(*, user_id: str, tenant_id: str) -> dict[str, Any]:
+    # Update only the tenant pointer; keep tokens unchanged.
+    # This supports "switch company" without forcing re-auth.
     row = get_xero_connection(user_id)
     if not row:
         raise RuntimeError("xero_not_connected")
@@ -268,6 +275,10 @@ def set_active_tenant(*, user_id: str, tenant_id: str) -> dict[str, Any]:
 
 
 async def create_draft_invoice(*, user_id: str, draft_payload: dict[str, Any]) -> dict[str, Any]:
+    # Upload path contract:
+    # 1) try with current token (after proactive refresh)
+    # 2) if Xero still returns 401, force one refresh + single retry
+    # 3) bubble explicit error for frontend to trigger re-auth modal
     row = await _refresh_access_token_if_needed(user_id=user_id)
 
     access_token = row.get("access_token")
