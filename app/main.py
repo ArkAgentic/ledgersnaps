@@ -35,11 +35,27 @@ from .schemas import (
 )
 from .splitter import split_pdf_auto
 from .storage_backend import StorageBackend
-from .store import create_job, get_job_owned, get_job_result_owned, list_jobs_owned, set_job_status_owned, upsert_job_result_owned, update_job_submission_owned
+from .store import (
+    create_job,
+    delete_xero_connection,
+    get_job_owned,
+    get_job_result_owned,
+    list_jobs_owned,
+    set_job_status_owned,
+    upsert_job_result_owned,
+    update_job_submission_owned,
+)
 from .store import list_queue_counts
 from .validators import validate_pdf_bytes
 from .xero_mapper import to_xero_accpay_draft
-from .xero_oauth import build_connect_url, create_draft_invoice, exchange_code, get_connection_status
+from .xero_oauth import (
+    build_connect_url,
+    create_draft_invoice,
+    exchange_code,
+    get_connection_status,
+    get_connection_status_live,
+    set_active_tenant,
+)
 from .xero_payload_validator import validate_xero_draft_payload
 
 app = FastAPI(title="LedgerSnaps API", version="0.4.1")
@@ -868,7 +884,25 @@ async def xero_token_exchange(
 
 @app.get("/api/v1/xero/connection")
 async def xero_connection(user: CurrentUser = Depends(_current_user)) -> dict:
-    return get_connection_status(user_id=user.user_id)
+    return await get_connection_status_live(user_id=user.user_id)
+
+
+@app.post("/api/v1/xero/disconnect")
+async def xero_disconnect(user: CurrentUser = Depends(_current_user)) -> dict:
+    delete_xero_connection(user.user_id)
+    return {"ok": True, "connected": False}
+
+
+@app.post("/api/v1/xero/switch-tenant")
+async def xero_switch_tenant(
+    tenant_id: str = Query(..., min_length=1),
+    user: CurrentUser = Depends(_current_user),
+) -> dict:
+    try:
+        out = set_active_tenant(user_id=user.user_id, tenant_id=tenant_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, **out}
 
 
 @app.post("/api/v1/xero/drafts")
@@ -895,7 +929,34 @@ async def xero_create_draft(
     try:
         xero_resp = await create_draft_invoice(user_id=user.user_id, draft_payload=draft_payload)
     except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        msg = str(e)
+        if msg.startswith("xero_not_connected"):
+            try:
+                connect = build_connect_url(user_id=user.user_id)
+            except Exception:
+                connect = None
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "xero_auth_required",
+                    "message": "Xero authorization required before upload",
+                    "connect": connect,
+                },
+            ) from e
+        if msg.startswith("xero_token_refresh_failed"):
+            try:
+                connect = build_connect_url(user_id=user.user_id)
+            except Exception:
+                connect = None
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "xero_reauth_required",
+                    "message": "Xero session expired, please re-authorize",
+                    "connect": connect,
+                },
+            ) from e
+        raise HTTPException(status_code=400, detail=msg) from e
     return {
         "ok": True,
         "target": "xero",

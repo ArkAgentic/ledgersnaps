@@ -150,10 +150,125 @@ def get_connection_status(*, user_id: str) -> dict[str, Any]:
     }
 
 
-async def create_draft_invoice(*, user_id: str, draft_payload: dict[str, Any]) -> dict[str, Any]:
+def _is_expiring_soon(expires_at_iso: Optional[str], seconds: int = 120) -> bool:
+    if not expires_at_iso:
+        return True
+    try:
+        dt = datetime.fromisoformat(str(expires_at_iso).replace("Z", "+00:00"))
+    except Exception:
+        return True
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt <= (datetime.now(timezone.utc) + timedelta(seconds=seconds))
+
+
+async def _refresh_access_token_if_needed(*, user_id: str, force: bool = False) -> dict[str, Any]:
     row = get_xero_connection(user_id)
     if not row:
         raise RuntimeError("xero_not_connected")
+
+    if not force and not _is_expiring_soon(row.get("expires_at")):
+        return row
+
+    refresh_token = row.get("refresh_token")
+    if not refresh_token:
+        raise RuntimeError("xero_missing_refresh_token")
+
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }
+    headers = {
+        "Authorization": _basic_auth_header(),
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(_TOKEN_URL, data=data, headers=headers)
+        if r.status_code >= 400:
+            raise RuntimeError(f"xero_token_refresh_failed:{r.status_code}:{r.text[:200]}")
+        tok = r.json()
+        access_token = tok.get("access_token")
+        new_refresh_token = tok.get("refresh_token") or refresh_token
+        token_type = tok.get("token_type")
+        scope = tok.get("scope")
+        expires_in = int(tok.get("expires_in", 1800) or 1800)
+        if not access_token:
+            raise RuntimeError("xero_token_refresh_payload_invalid")
+
+        conns = await _list_connections_with_access_token(access_token)
+        tenant_id = row.get("tenant_id")
+        if conns:
+            candidate_ids = {str(c.get("tenantId")) for c in conns if c.get("tenantId")}
+            if tenant_id not in candidate_ids:
+                tenant_id = str(conns[0].get("tenantId"))
+
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+    upsert_xero_connection(
+        user_id,
+        tenant_id=str(tenant_id),
+        access_token=str(access_token),
+        refresh_token=str(new_refresh_token),
+        token_type=token_type,
+        scope=scope,
+        expires_at=expires_at,
+    )
+    refreshed = get_xero_connection(user_id)
+    if not refreshed:
+        raise RuntimeError("xero_connection_refresh_readback_failed")
+    return refreshed
+
+
+async def _list_connections_with_access_token(access_token: str) -> list[dict[str, Any]]:
+    if not access_token:
+        return []
+    async with httpx.AsyncClient(timeout=20) as client:
+        rc = await client.get(_CONNECTIONS_URL, headers={"Authorization": f"Bearer {access_token}"})
+        if rc.status_code >= 400:
+            return []
+        data = rc.json()
+        if isinstance(data, list):
+            return [dict(x) for x in data if isinstance(x, dict)]
+        return []
+
+
+async def get_connection_status_live(*, user_id: str) -> dict[str, Any]:
+    row = get_xero_connection(user_id)
+    if not row:
+        return {"connected": False}
+    try:
+        row = await _refresh_access_token_if_needed(user_id=user_id)
+    except Exception:
+        pass
+
+    tenants = await _list_connections_with_access_token(str(row.get("access_token") or ""))
+    return {
+        "connected": True,
+        "tenant_id": row.get("tenant_id"),
+        "scope": row.get("scope"),
+        "expires_at": row.get("expires_at"),
+        "tenants": tenants,
+    }
+
+
+def set_active_tenant(*, user_id: str, tenant_id: str) -> dict[str, Any]:
+    row = get_xero_connection(user_id)
+    if not row:
+        raise RuntimeError("xero_not_connected")
+    upsert_xero_connection(
+        user_id,
+        tenant_id=tenant_id,
+        access_token=str(row.get("access_token") or ""),
+        refresh_token=str(row.get("refresh_token") or ""),
+        token_type=row.get("token_type"),
+        scope=row.get("scope"),
+        expires_at=str(row.get("expires_at") or ""),
+    )
+    return get_connection_status(user_id=user_id)
+
+
+async def create_draft_invoice(*, user_id: str, draft_payload: dict[str, Any]) -> dict[str, Any]:
+    row = await _refresh_access_token_if_needed(user_id=user_id)
 
     access_token = row.get("access_token")
     tenant_id = row.get("tenant_id")
@@ -170,6 +285,12 @@ async def create_draft_invoice(*, user_id: str, draft_payload: dict[str, Any]) -
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(_INVOICES_URL, json=body, headers=headers)
+        if r.status_code == 401:
+            # one retry after forced refresh
+            row = await _refresh_access_token_if_needed(user_id=user_id, force=True)
+            headers["Authorization"] = f"Bearer {row.get('access_token')}"
+            headers["xero-tenant-id"] = str(row.get("tenant_id") or tenant_id)
+            r = await client.post(_INVOICES_URL, json=body, headers=headers)
         if r.status_code >= 400:
             raise RuntimeError(f"xero_create_draft_failed:{r.status_code}:{r.text[:300]}")
         return r.json()

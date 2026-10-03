@@ -630,6 +630,13 @@ def get_xero_connection(user_id: str) -> Optional[dict[str, Any]]:
     return dict(row) if row else None
 
 
+def delete_xero_connection(user_id: str) -> None:
+    conn = _ensure_conn()
+    with _DB_LOCK:
+        conn.execute("DELETE FROM xero_connections WHERE user_id=?", (user_id,))
+        conn.commit()
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
