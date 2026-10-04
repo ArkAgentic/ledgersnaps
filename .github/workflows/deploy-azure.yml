@@ -7,7 +7,7 @@ on:
 
 env:
   AZURE_RESOURCE_GROUP: LedgerSnapsProductionApplicationAustraliaEast
-  AZURE_CONTAINER_APP_NAME: ca-ledgersnaps-api-aue
+  AZURE_CONTAINER_APP_NAME: ca-ledgersnaps-api
   AZURE_CONTAINER_REGISTRY: acrledgersnapsaue001.azurecr.io
   AZURE_CONTAINER_REGISTRY_NAME: acrledgersnapsaue001
   IMAGE_NAME: ledgersnaps-api
