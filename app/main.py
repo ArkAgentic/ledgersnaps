@@ -360,7 +360,7 @@ document.getElementById('f').addEventListener('submit', async (e)=>{
 
 @app.get("/", response_class=HTMLResponse)
 async def landing_page() -> HTMLResponse:
-    proto = Path(__file__).resolve().parents[1] / "docs" / "ui-prototypes" / "landing-split-auth-sora.html"
+    proto = Path(__file__).resolve().parents[1] / "app" / "templates" / "landing-main.html"
     if not proto.exists():
         raise HTTPException(status_code=500, detail="landing_template_missing")
     return HTMLResponse(content=proto.read_text(encoding="utf-8"))
