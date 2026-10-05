@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import secrets
 import time
@@ -46,6 +47,14 @@ def _default_scope() -> str:
     return os.getenv("XERO_SCOPE", "offline_access accounting.invoices accounting.contacts").strip()
 
 
+def _public_auth_scope() -> str:
+    # For sign-in/sign-up identity and future invoice draft push in one consent.
+    return os.getenv(
+        "XERO_AUTH_SCOPE",
+        "openid profile email offline_access accounting.invoices accounting.contacts",
+    ).strip()
+
+
 def _basic_auth_header() -> str:
     raw = f"{_client_id()}:{_client_secret()}".encode()
     return "Basic " + base64.b64encode(raw).decode()
@@ -56,16 +65,94 @@ def _code_challenge(verifier: str) -> str:
     return base64.urlsafe_b64encode(h).decode().rstrip("=")
 
 
+def _b64url_decode(data: str) -> bytes:
+    pad = "=" * ((4 - len(data) % 4) % 4)
+    return base64.urlsafe_b64decode(data + pad)
+
+
+def _parse_jwt_payload_unverified(token: str) -> dict[str, Any]:
+    # Xero id_token payload parsing for identity bootstrap.
+    # Signature verification can be added with JWK retrieval if needed.
+    try:
+        parts = token.split(".")
+        if len(parts) < 2:
+            return {}
+        payload_raw = _b64url_decode(parts[1]).decode("utf-8")
+        data = json.loads(payload_raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+async def _exchange_token_payload(*, code: str, verifier: str) -> dict[str, Any]:
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": _redirect_uri(),
+        "code_verifier": verifier,
+    }
+    headers = {
+        "Authorization": _basic_auth_header(),
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(_TOKEN_URL, data=data, headers=headers)
+        if r.status_code >= 400:
+            raise RuntimeError(f"xero_token_exchange_failed:{r.status_code}:{r.text[:200]}")
+        tok = r.json()
+        if not isinstance(tok, dict):
+            raise RuntimeError("xero_token_payload_invalid")
+        return tok
+
+
+async def _fetch_connections(access_token: str) -> list[dict[str, Any]]:
+    async with httpx.AsyncClient(timeout=30) as client:
+        rc = await client.get(_CONNECTIONS_URL, headers={"Authorization": f"Bearer {access_token}"})
+        if rc.status_code >= 400:
+            raise RuntimeError(f"xero_connections_fetch_failed:{rc.status_code}:{rc.text[:200]}")
+        data = rc.json()
+        return data if isinstance(data, list) else []
+
+
 def build_connect_url(*, user_id: str) -> dict[str, str]:
     state = secrets.token_urlsafe(24)
     verifier = secrets.token_urlsafe(48)
-    _STATE_CACHE[state] = {"user_id": user_id, "verifier": verifier, "created_at": int(time.time())}
+    _STATE_CACHE[state] = {
+        "mode": "linked",
+        "user_id": user_id,
+        "verifier": verifier,
+        "created_at": int(time.time()),
+    }
 
     params = {
         "response_type": "code",
         "client_id": _client_id(),
         "redirect_uri": _redirect_uri(),
         "scope": _default_scope(),
+        "state": state,
+        "code_challenge": _code_challenge(verifier),
+        "code_challenge_method": "S256",
+    }
+    return {
+        "state": state,
+        "url": _AUTH_BASE + "?" + urllib.parse.urlencode(params),
+    }
+
+
+def build_public_connect_url() -> dict[str, str]:
+    state = secrets.token_urlsafe(24)
+    verifier = secrets.token_urlsafe(48)
+    _STATE_CACHE[state] = {
+        "mode": "public",
+        "verifier": verifier,
+        "created_at": int(time.time()),
+    }
+
+    params = {
+        "response_type": "code",
+        "client_id": _client_id(),
+        "redirect_uri": _redirect_uri(),
+        "scope": _public_auth_scope(),
         "state": state,
         "code_challenge": _code_challenge(verifier),
         "code_challenge_method": "S256",
@@ -83,40 +170,22 @@ async def exchange_code(*, code: str, state: str) -> dict[str, Any]:
 
     verifier = st["verifier"]
     user_id = st["user_id"]
-    data = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": _redirect_uri(),
-        "code_verifier": verifier,
-    }
-    headers = {
-        "Authorization": _basic_auth_header(),
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
+    tok = await _exchange_token_payload(code=code, verifier=verifier)
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(_TOKEN_URL, data=data, headers=headers)
-        if r.status_code >= 400:
-            raise RuntimeError(f"xero_token_exchange_failed:{r.status_code}:{r.text[:200]}")
-        tok = r.json()
+    access_token = tok.get("access_token")
+    refresh_token = tok.get("refresh_token")
+    token_type = tok.get("token_type")
+    scope = tok.get("scope")
+    expires_in = int(tok.get("expires_in", 1800) or 1800)
+    if not access_token or not refresh_token:
+        raise RuntimeError("xero_token_payload_invalid")
 
-        access_token = tok.get("access_token")
-        refresh_token = tok.get("refresh_token")
-        token_type = tok.get("token_type")
-        scope = tok.get("scope")
-        expires_in = int(tok.get("expires_in", 1800) or 1800)
-        if not access_token or not refresh_token:
-            raise RuntimeError("xero_token_payload_invalid")
-
-        rc = await client.get(_CONNECTIONS_URL, headers={"Authorization": f"Bearer {access_token}"})
-        if rc.status_code >= 400:
-            raise RuntimeError(f"xero_connections_fetch_failed:{rc.status_code}:{rc.text[:200]}")
-        conns = rc.json() if isinstance(rc.json(), list) else []
-        if not conns:
-            raise RuntimeError("xero_no_tenant_connection")
-        tenant_id = conns[0].get("tenantId")
-        if not tenant_id:
-            raise RuntimeError("xero_missing_tenant_id")
+    conns = await _fetch_connections(str(access_token))
+    if not conns:
+        raise RuntimeError("xero_no_tenant_connection")
+    tenant_id = conns[0].get("tenantId")
+    if not tenant_id:
+        raise RuntimeError("xero_missing_tenant_id")
 
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
     upsert_xero_connection(
@@ -135,6 +204,60 @@ async def exchange_code(*, code: str, state: str) -> dict[str, Any]:
         "tenant_id": tenant_id,
         "scope": scope,
         "expires_at": expires_at,
+    }
+
+
+async def exchange_code_public(*, code: str, state: str) -> dict[str, Any]:
+    st = _STATE_CACHE.get(state)
+    if not st or st.get("mode") != "public":
+        raise RuntimeError("xero_invalid_state")
+
+    verifier = st["verifier"]
+    tok = await _exchange_token_payload(code=code, verifier=verifier)
+
+    access_token = str(tok.get("access_token") or "")
+    refresh_token = str(tok.get("refresh_token") or "")
+    token_type = tok.get("token_type")
+    scope = tok.get("scope")
+    expires_in = int(tok.get("expires_in", 1800) or 1800)
+    id_token = str(tok.get("id_token") or "")
+    if not access_token or not refresh_token:
+        raise RuntimeError("xero_token_payload_invalid")
+
+    claims = _parse_jwt_payload_unverified(id_token) if id_token else {}
+    provider_subject_id = str(claims.get("sub") or "").strip()
+    provider_email = str(claims.get("email") or "").strip() or None
+    full_name = (
+        str(claims.get("name") or "").strip()
+        or str(claims.get("preferred_username") or "").strip()
+        or None
+    )
+
+    conns = await _fetch_connections(access_token)
+    tenant_id = None
+    tenant_name = None
+    if conns:
+        tenant_id = conns[0].get("tenantId")
+        tenant_name = conns[0].get("tenantName")
+
+    if not provider_subject_id:
+        raise RuntimeError("xero_identity_missing_sub")
+
+    _STATE_CACHE.pop(state, None)
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+
+    return {
+        "provider": "xero",
+        "provider_subject_id": provider_subject_id,
+        "provider_email": provider_email,
+        "full_name": full_name,
+        "tenant_id": tenant_id,
+        "tenant_name": tenant_name,
+        "scope": scope,
+        "expires_at": expires_at,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": token_type,
     }
 
 

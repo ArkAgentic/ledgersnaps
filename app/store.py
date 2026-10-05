@@ -128,10 +128,29 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS oauth_identities (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              provider TEXT NOT NULL,
+              provider_subject_id TEXT NOT NULL,
+              provider_email TEXT,
+              provider_tenant_id TEXT,
+              provider_tenant_name TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_entitlements_phone_hash_unique ON user_entitlements(phone_hash)")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_provider_subject_unique ON oauth_identities(provider, provider_subject_id)"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_oauth_user_id ON oauth_identities(user_id)")
         cols = {r[1] for r in conn.execute("PRAGMA table_info(job_queue)").fetchall()}
         if "last_error" not in cols:
             conn.execute("ALTER TABLE job_queue ADD COLUMN last_error TEXT")
@@ -637,9 +656,81 @@ def delete_xero_connection(user_id: str) -> None:
         conn.commit()
 
 
+def upsert_oauth_identity(
+    *,
+    user_id: str,
+    provider: str,
+    provider_subject_id: str,
+    provider_email: Optional[str],
+    provider_tenant_id: Optional[str],
+    provider_tenant_name: Optional[str],
+) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    row_id = str(uuid.uuid4())
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO oauth_identities(
+              id, user_id, provider, provider_subject_id, provider_email, provider_tenant_id, provider_tenant_name, created_at, updated_at
+            )
+            VALUES(?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(provider, provider_subject_id) DO UPDATE SET
+              user_id=excluded.user_id,
+              provider_email=excluded.provider_email,
+              provider_tenant_id=excluded.provider_tenant_id,
+              provider_tenant_name=excluded.provider_tenant_name,
+              updated_at=excluded.updated_at
+            """,
+            (
+                row_id,
+                user_id,
+                provider,
+                provider_subject_id,
+                provider_email,
+                provider_tenant_id,
+                provider_tenant_name,
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+
+
+def get_oauth_identity(*, provider: str, provider_subject_id: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT id, user_id, provider, provider_subject_id, provider_email, provider_tenant_id, provider_tenant_name, created_at, updated_at
+        FROM oauth_identities
+        WHERE provider=? AND provider_subject_id=?
+        LIMIT 1
+        """,
+        (provider, provider_subject_id),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+        FROM users
+        WHERE email=?
+        LIMIT 1
+        """,
+        (str(email or "").strip(),),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
+        conn.execute("DELETE FROM oauth_identities")
         conn.execute("DELETE FROM xero_connections")
         conn.execute("DELETE FROM users")
         conn.execute("DELETE FROM user_entitlements")

@@ -1,5 +1,7 @@
 from io import BytesIO
 import os
+import secrets
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -38,19 +40,25 @@ from .storage_backend import StorageBackend
 from .store import (
     create_job,
     delete_xero_connection,
+    get_oauth_identity,
+    get_user_by_email,
     get_job_owned,
     get_job_result_owned,
     list_jobs_owned,
+    upsert_oauth_identity,
     set_job_status_owned,
     upsert_job_result_owned,
     update_job_submission_owned,
+    upsert_xero_connection,
 )
 from .store import list_queue_counts
 from .validators import validate_pdf_bytes
 from .xero_mapper import to_xero_accpay_draft
 from .xero_oauth import (
+    build_public_connect_url,
     build_connect_url,
     create_draft_invoice,
+    exchange_code_public,
     exchange_code,
     get_connection_status,
     get_connection_status_live,
@@ -60,6 +68,7 @@ from .xero_payload_validator import validate_xero_draft_payload
 
 app = FastAPI(title="LedgerSnaps API", version="0.4.1")
 queue_backend = QueueBackend(settings.queue_backend)
+_OAUTH_SIGNUP_CACHE: dict[str, dict] = {}
 
 
 def _current_user(
@@ -791,6 +800,172 @@ async def auth_phone_send_code(phone_e164: str = Query(..., min_length=8)) -> di
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
     return out
+
+
+def _issue_oauth_signup_token(payload: dict) -> str:
+    tok = secrets.token_urlsafe(24)
+    _OAUTH_SIGNUP_CACHE[tok] = {**payload, "created_at": int(time.time())}
+    return tok
+
+
+def _consume_oauth_signup_token(token: str, *, max_age_seconds: int = 600) -> dict:
+    rec = _OAUTH_SIGNUP_CACHE.get(token)
+    if not rec:
+        raise HTTPException(status_code=400, detail="oauth_session_expired")
+    created = int(rec.get("created_at", 0) or 0)
+    if created <= 0 or int(time.time()) - created > max_age_seconds:
+        _OAUTH_SIGNUP_CACHE.pop(token, None)
+        raise HTTPException(status_code=400, detail="oauth_session_expired")
+    _OAUTH_SIGNUP_CACHE.pop(token, None)
+    return rec
+
+
+@app.get("/api/v1/auth/xero/start")
+async def auth_xero_start() -> dict:
+    try:
+        out = build_public_connect_url()
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return out
+
+
+@app.get("/api/v1/auth/xero/callback/public")
+async def auth_xero_callback_public(code: str = Query(...), state: str = Query(...)) -> dict:
+    try:
+        oauth = await exchange_code_public(code=code, state=state)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    provider_subject_id = str(oauth.get("provider_subject_id") or "")
+    provider_email = str(oauth.get("provider_email") or "").strip() or None
+    full_name = str(oauth.get("full_name") or "").strip() or None
+
+    bound = get_oauth_identity(provider="xero", provider_subject_id=provider_subject_id)
+    if bound:
+        user_id = str(bound.get("user_id"))
+        tenant_id = str(oauth.get("tenant_id") or "")
+        if tenant_id:
+            upsert_xero_connection(
+                user_id,
+                tenant_id=tenant_id,
+                access_token=str(oauth.get("access_token") or ""),
+                refresh_token=str(oauth.get("refresh_token") or ""),
+                token_type=oauth.get("token_type"),
+                scope=oauth.get("scope"),
+                expires_at=str(oauth.get("expires_at") or ""),
+            )
+        token = issue_dev_token(user_id=user_id, tenant_id="default")
+        return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/dashboard/upload"}
+
+    if provider_email:
+        by_email = get_user_by_email(provider_email)
+        if by_email:
+            user_id = str(by_email.get("user_id"))
+            upsert_oauth_identity(
+                user_id=user_id,
+                provider="xero",
+                provider_subject_id=provider_subject_id,
+                provider_email=provider_email,
+                provider_tenant_id=str(oauth.get("tenant_id") or "") or None,
+                provider_tenant_name=str(oauth.get("tenant_name") or "") or None,
+            )
+            upsert_xero_connection(
+                user_id,
+                tenant_id=str(oauth.get("tenant_id") or ""),
+                access_token=str(oauth.get("access_token") or ""),
+                refresh_token=str(oauth.get("refresh_token") or ""),
+                token_type=oauth.get("token_type"),
+                scope=oauth.get("scope"),
+                expires_at=str(oauth.get("expires_at") or ""),
+            )
+            token = issue_dev_token(user_id=user_id, tenant_id="default")
+            return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/dashboard/upload"}
+
+    session_token = _issue_oauth_signup_token(
+        {
+            "provider": "xero",
+            "provider_subject_id": provider_subject_id,
+            "provider_email": provider_email,
+            "full_name": full_name,
+            "tenant_id": str(oauth.get("tenant_id") or "") or None,
+            "tenant_name": str(oauth.get("tenant_name") or "") or None,
+            "access_token": str(oauth.get("access_token") or ""),
+            "refresh_token": str(oauth.get("refresh_token") or ""),
+            "token_type": oauth.get("token_type"),
+            "scope": oauth.get("scope"),
+            "expires_at": str(oauth.get("expires_at") or ""),
+        }
+    )
+    return {
+        "status": "signup_required",
+        "provider": "xero",
+        "prefill": {"email": provider_email, "full_name": full_name},
+        "oauth_session_token": session_token,
+        "redirect": "/signup/complete",
+    }
+
+
+@app.post("/api/v1/auth/oauth/complete-signup")
+async def auth_oauth_complete_signup(
+    request: Request,
+    oauth_session_token: str = Query(..., min_length=8),
+    user_id: str = Query(..., min_length=1),
+    email: str = Query(..., min_length=3),
+    full_name: str = Query(..., min_length=1),
+    phone_e164: str = Query(..., min_length=8),
+    phone_otp_code: str = Query(..., min_length=4),
+    device_fingerprint: Optional[str] = Query(None),
+) -> dict:
+    rec = _consume_oauth_signup_token(oauth_session_token)
+    if str(rec.get("provider")) != "xero":
+        raise HTTPException(status_code=400, detail="unsupported_oauth_provider")
+
+    try:
+        _ = validate_phone_e164(phone_e164)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not otp_provider.verify_code(phone_e164, phone_otp_code):
+        raise HTTPException(status_code=400, detail="phone_verification_required")
+
+    try:
+        check = check_trial_eligibility(phone_e164)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not check.eligible:
+        raise HTTPException(status_code=403, detail=check.reason)
+
+    try:
+        record_trial_claim(
+            user_id,
+            phone_e164=phone_e164,
+            device_fingerprint=device_fingerprint,
+            signup_ip=(request.client.host if request and request.client else None),
+            email=email,
+            full_name=full_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+    upsert_oauth_identity(
+        user_id=user_id,
+        provider="xero",
+        provider_subject_id=str(rec.get("provider_subject_id") or ""),
+        provider_email=str(rec.get("provider_email") or email),
+        provider_tenant_id=rec.get("tenant_id"),
+        provider_tenant_name=rec.get("tenant_name"),
+    )
+    upsert_xero_connection(
+        user_id,
+        tenant_id=str(rec.get("tenant_id") or ""),
+        access_token=str(rec.get("access_token") or ""),
+        refresh_token=str(rec.get("refresh_token") or ""),
+        token_type=rec.get("token_type"),
+        scope=rec.get("scope"),
+        expires_at=str(rec.get("expires_at") or ""),
+    )
+
+    token = issue_dev_token(user_id=user_id, tenant_id="default")
+    return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/dashboard/upload"}
 
 
 @app.get("/api/v1/billing/me")
