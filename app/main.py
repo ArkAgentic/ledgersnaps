@@ -363,12 +363,26 @@ document.getElementById('f').addEventListener('submit', async (e)=>{
 
 
 
+def _render_template_or_500(name: str, missing_code: str) -> HTMLResponse:
+    template = Path(__file__).resolve().parents[1] / "app" / "templates" / name
+    if not template.exists():
+        raise HTTPException(status_code=500, detail=missing_code)
+    return HTMLResponse(content=template.read_text(encoding="utf-8"))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def landing_page() -> HTMLResponse:
-    proto = Path(__file__).resolve().parents[1] / "app" / "templates" / "landing-main.html"
-    if not proto.exists():
-        raise HTTPException(status_code=500, detail="landing_template_missing")
-    return HTMLResponse(content=proto.read_text(encoding="utf-8"))
+    return _render_template_or_500("landing-main.html", "landing_template_missing")
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page() -> HTMLResponse:
+    return _render_template_or_500("privacy.html", "privacy_template_missing")
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page() -> HTMLResponse:
+    return _render_template_or_500("terms.html", "terms_template_missing")
 
 
 @app.get("/playground", response_class=HTMLResponse)
