@@ -194,6 +194,30 @@ def test_xero_connection_default_false_without_exchange():
     assert r.json().get("connected") is False
 
 
+def test_xero_public_start_requires_config_or_returns_url():
+    r = client.get("/api/v1/auth/xero/start")
+    assert r.status_code in {200, 400}
+    if r.status_code == 200:
+        body = r.json()
+        assert "url" in body and "state" in body
+    else:
+        assert "xero_config_missing" in r.json().get("detail", "")
+
+
+def test_oauth_complete_signup_invalid_or_expired_session_token():
+    r = client.post(
+        "/api/v1/auth/oauth/complete-signup"
+        "?oauth_session_token=missing-token"
+        "&user_id=u-test"
+        "&email=u%40example.com"
+        "&full_name=User%20Test"
+        "&phone_e164=%2B61400111222"
+        "&phone_otp_code=123456"
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "oauth_session_expired"
+
+
 def test_xero_draft_requires_connected_account():
     t = client.get("/api/v1/auth/dev-token?user_id=xero-user3&tenant_id=t1")
     h = {"Authorization": f"Bearer {t.json()['token']}"}
