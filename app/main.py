@@ -11,6 +11,7 @@ from typing import cast
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from .abn import abr_lookup_by_name, compliance_warnings_for_abn, lookup_abn_context
 from .auth import CurrentUser, bearer_scheme, issue_dev_token, resolve_current_user
@@ -67,6 +68,10 @@ from .xero_oauth import (
 from .xero_payload_validator import validate_xero_draft_payload
 
 app = FastAPI(title="LedgerSnaps API", version="0.4.1")
+
+_ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+if _ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
 queue_backend = QueueBackend(settings.queue_backend)
 _OAUTH_SIGNUP_CACHE: dict[str, dict] = {}
 
