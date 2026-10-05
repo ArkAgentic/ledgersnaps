@@ -165,7 +165,7 @@ def test_send_code_endpoint_returns_dev_code_in_dev_mode():
 
 
 def test_playground_contains_phone_otp_controls():
-    r = client.get("/")
+    r = client.get("/playground")
     assert r.status_code == 200
     html = r.text
     assert "id='phone'" in html

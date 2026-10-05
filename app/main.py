@@ -357,7 +357,16 @@ document.getElementById('f').addEventListener('submit', async (e)=>{
     return HTMLResponse(content=html)
 
 
+
 @app.get("/", response_class=HTMLResponse)
+async def landing_page() -> HTMLResponse:
+    proto = Path(__file__).resolve().parents[1] / "docs" / "ui-prototypes" / "landing-split-auth-sora.html"
+    if not proto.exists():
+        raise HTTPException(status_code=500, detail="landing_template_missing")
+    return HTMLResponse(content=proto.read_text(encoding="utf-8"))
+
+
+@app.get("/playground", response_class=HTMLResponse)
 async def playground() -> HTMLResponse:
     html = """
 <!doctype html><html><body style='font-family:system-ui;max-width:860px;margin:24px auto;padding:0 12px;'>
