@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ledgersnaps Landing v3</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --brand-red:#E32652; }
+    body { font-family:'Sora',sans-serif; }
+    .left-bg {
+      /* extensible, no distortion */
+      background-image: linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .right-bg {
+      background-image: url('/assets/images/landing-bg-light.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    details > summary::-webkit-details-marker { display:none; }
+    details[open] .lang-menu { display:block; }
+    .lang-menu { display:none; }
+
+    .logo-cloud-wrap {
+      overflow: hidden;
+      width: 90%;
+      max-width: 760px;
+      padding-top: 1rem;
+      padding-bottom: 0.25rem;
+      -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+      mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+    }
+    .logo-cloud-track {
+      display: flex;
+      align-items: center;
+      gap: 4.75rem;
+      width: max-content;
+      animation: logo-slide 38s linear infinite reverse;
+    }
+    .logo-cloud-track img {
+      height: 4.35rem;
+      opacity: 0.88;
+      flex: 0 0 auto;
+    }
+    .logo-cloud-track img.logo-openai {
+      filter: invert(1) brightness(1.2);
+    }
+    @media (max-width: 767px) {
+      .logo-cloud-wrap {
+        width: 90%;
+      }
+    }
+    @media (min-width: 768px) {
+      .logo-cloud-track img { height: 4.8rem; }
+    }
+    @keyframes logo-slide {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    .btn-loading { opacity: .7; pointer-events: none; }
+  </style>
+</head>
+<body class="bg-white text-neutral-900">
+  <main class="grid grid-cols-1 md:grid-cols-12 min-h-screen">
+    <section class="col-span-12 md:col-span-7 left-bg px-8 md:px-16 lg:px-20 py-12 md:py-14 flex flex-col min-h-screen">
+      <header class="flex items-center">
+        <div class="flex items-center gap-3">
+          <img src="/assets/images/logo-transparent.png" alt="Ledgersnaps mark" class="h-10 md:h-12 w-auto" />
+          <span class="text-white text-2xl md:text-3xl tracking-[0.08em] font-medium">LEDGERSNAPS</span>
+        </div>
+      </header>
+
+      <div class="flex-1 flex items-center pt-10 md:pt-14">
+        <div>
+          <h1 class="text-4xl md:text-5xl font-semibold tracking-[0.01em] text-white leading-[1.2] md:leading-[1.22] max-w-4xl">
+            <span data-i18n="hero_title">Turn receipts and invoices into Xero or MYOB drafts in seconds.</span>
+          </h1>
+
+          <p class="mt-6 text-lg text-neutral-200 max-w-3xl leading-relaxed">
+            <span data-i18n="hero_subtitle">AI-powered invoice extraction with automatic ATO ABN & GST validation. Built for Australian accountants and businesses.</span>
+          </p>
+
+          <ul class="mt-10 space-y-4 text-base md:text-lg text-white/95 max-w-4xl">
+            <li class="flex items-start gap-3"><span class="text-[#E32652]">✓</span><span data-i18n="f1">Enterprise-grade data encryption & strict Australian privacy compliance</span></li>
+            <li class="flex items-start gap-3"><span class="text-[#E32652]">✓</span><span data-i18n="f2">One-click draft bill creation in Xero or MYOB</span></li>
+            <li class="flex items-start gap-3"><span class="text-[#E32652]">✓</span><span data-i18n="f3">Line-item extraction with human review controls</span></li>
+            <li class="flex items-start gap-3"><span class="text-[#E32652]">✓</span><span data-i18n="f4">Bulk upload for month-end processing</span></li>
+            <li class="flex items-start gap-3"><span class="text-[#E32652]">✓</span><span data-i18n="f5">Duplicate invoice detection & Full audit trail (source file + extraction + export status)</span></li>
+          </ul>
+
+          <p class="text-[11px] tracking-[0.18em] text-white/55 mt-10 md:mt-12 mb-4" data-i18n="powered_by">POWERED BY SECURE ENTERPRISE INFRASTRUCTURE</p>
+          <div class="logo-cloud-wrap">
+            <div class="logo-cloud-track">
+              <img src="/assets/images/providers/xero.svg" alt="Xero" loading="lazy" />
+              <img src="/assets/images/providers/myob.svg" alt="MYOB" loading="lazy" />
+              <img src="/assets/images/providers/openai.svg" alt="OpenAI" class="logo-openai" loading="lazy" />
+              <img src="/assets/images/providers/azure.svg" alt="Azure" loading="lazy" />
+              <img src="/assets/images/providers/microsoft-alt.svg" alt="Microsoft" loading="lazy" />
+              <img src="/assets/images/providers/typescript.svg" alt="TypeScript" loading="lazy" />
+              <img src="/assets/images/providers/openclaw.svg" alt="OpenClaw" loading="lazy" />
+              <img src="/assets/images/providers/claude-ai-icon.svg" alt="Claude AI" loading="lazy" />
+              <img src="/assets/images/providers/xero.svg" alt="Xero" loading="lazy" />
+              <img src="/assets/images/providers/myob.svg" alt="MYOB" loading="lazy" />
+              <img src="/assets/images/providers/openai.svg" alt="OpenAI" class="logo-openai" loading="lazy" />
+              <img src="/assets/images/providers/azure.svg" alt="Azure" loading="lazy" />
+              <img src="/assets/images/providers/microsoft-alt.svg" alt="Microsoft" loading="lazy" />
+              <img src="/assets/images/providers/typescript.svg" alt="TypeScript" loading="lazy" />
+              <img src="/assets/images/providers/openclaw.svg" alt="OpenClaw" loading="lazy" />
+              <img src="/assets/images/providers/claude-ai-icon.svg" alt="Claude AI" loading="lazy" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-14 md:pt-16">
+        <footer class="border-t border-white/15 pt-5">
+          <div class="flex flex-col gap-y-3">
+            <div class="flex items-center justify-between gap-6">
+              <nav class="flex flex-wrap items-center gap-x-7 gap-y-2 text-xs text-neutral-400 flex-1 min-w-0">
+                <a href="#" class="hover:text-white transition-colors" data-i18n="terms">Terms & Conditions</a>
+                <a href="#" class="hover:text-white transition-colors" data-i18n="privacy">Privacy</a>
+                <a href="#" class="hover:text-white transition-colors" data-i18n="pricing">Pricing</a>
+                <a href="#" class="hover:text-white transition-colors" data-i18n="support">Support</a>
+                <a href="#" class="hover:text-white transition-colors" data-i18n="contact">Contact Us</a>
+              </nav>
+
+              <div class="min-w-[170px] text-right">
+                <details class="relative inline-block">
+                  <summary class="list-none cursor-pointer inline-flex items-center text-xs text-neutral-400 hover:text-white transition-colors whitespace-nowrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-4 h-4 text-neutral-400 mr-1.5 inline-block" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12h18M12 3c2.5 2.4 4 5.6 4 9s-1.5 6.6-4 9m0-18c-2.5 2.4-4 5.6-4 9s1.5 6.6 4 9" />
+                    </svg>
+                    <span id="lang-current-label">English (AU)</span>
+                    <span class="ml-1">▾</span>
+                  </summary>
+                  <div class="lang-menu absolute right-0 bottom-full mb-2 min-w-[170px] rounded-xl border border-white/20 bg-[#0b1733] shadow-lg overflow-hidden z-10">
+                    <button class="w-full text-left px-3 py-2 text-xs text-white hover:bg-white/10 inline-flex items-center gap-2 font-medium" data-lang="en">
+                      <span>🇦🇺</span><span>English (AU)</span>
+                    </button>
+                    <button class="w-full text-left px-3 py-2 text-xs text-white hover:bg-white/10 inline-flex items-center gap-2 font-medium" data-lang="zh">
+                      <span>🇨🇳</span><span>中文 (CN)</span>
+                    </button>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <p class="text-xs text-neutral-400 tracking-[0.02em] text-center">LedgerSnaps Inc. © 2026. All rights reserved.</p>
+          </div>
+        </footer>
+      </div>
+    </section>
+
+    <section class="col-span-12 md:col-span-5 px-6 md:px-12 py-12 right-bg flex items-center justify-center">
+      <div class="w-full max-w-md">
+        <div class="h-2 md:h-3"></div>
+
+        <div class="space-y-4">
+          <button class="w-[80%] mx-auto h-11 rounded-xl border border-[#13B5EA] bg-[#13B5EA] text-white font-medium text-center px-4 block" id="btn-xero" data-action="xero-start" data-i18n="btn_xero">Continue with Xero</button>
+          <button class="w-[80%] mx-auto h-11 rounded-xl border border-[#6100A5] bg-[#6100A5] text-white font-medium text-center px-4 block" id="btn-myob" data-i18n="btn_myob">Continue with MYOB</button>
+        </div>
+
+        <div class="my-7 w-[80%] mx-auto h-px bg-neutral-300/70"></div>
+
+        <div class="space-y-4 w-[80%] mx-auto">
+          <div>
+            <label class="text-sm text-neutral-700 block" data-i18n="email">Email Address</label>
+            <input id="email-input" type="email" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          </div>
+          <div>
+            <label class="text-sm text-neutral-700 block" data-i18n="password">Password</label>
+            <input id="password-input" type="password" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          </div>
+        </div>
+
+        <button class="mt-6 w-[80%] mx-auto h-11 rounded-xl bg-[#E32652] text-white font-normal block" id="btn-signin" data-i18n="sign_in">Sign In</button>
+
+        <p class="mt-5 w-[80%] mx-auto text-sm text-neutral-600 text-center leading-6"><span data-i18n="no_account">Don’t have an account yet?</span><br><a href="/signup/complete" class="inline-block mt-1 text-[#E32652] underline" data-i18n="start_trial">Start your 7-day free trial</a></p>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const I18N = {
+        en: {
+          hero_title: 'Turn receipts and invoices into Xero or MYOB drafts in seconds.',
+          hero_subtitle: 'AI-powered invoice extraction with automatic ATO ABN & GST validation. Built for Australian accountants and businesses.',
+          f1: 'Enterprise-grade data encryption & strict Australian privacy compliance',
+          f2: 'One-click draft bill creation in Xero or MYOB',
+          f3: 'Line-item extraction with human review controls',
+          f4: 'Bulk upload for month-end processing',
+          f5: 'Duplicate invoice detection & Full audit trail (source file + extraction + export status)',
+          powered_by: 'POWERED BY SECURE ENTERPRISE INFRASTRUCTURE',
+          terms: 'Terms & Conditions',
+          privacy: 'Privacy',
+          pricing: 'Pricing',
+          support: 'Support',
+          contact: 'Contact Us',
+          btn_xero: 'Continue with Xero',
+          btn_myob: 'Continue with MYOB',
+          email: 'Email Address',
+          password: 'Password',
+          sign_in: 'Sign In',
+          no_account: 'Don’t have an account yet?',
+          start_trial: 'Start your 7-day free trial',
+          lang_label: 'English (AU)'
+        },
+        zh: {
+          hero_title: '发票与收据，几秒即可生成 Xero 或 MYOB 草稿账单。',
+          hero_subtitle: 'AI 智能提取发票信息，自动核验 ATO ABN 与 GST 状态，专为澳洲会计师与企业打造。',
+          f1: '企业级数据加密，严格遵循澳洲隐私合规要求',
+          f2: '一键生成 Xero 或 MYOB 草稿账单',
+          f3: '支持行项目明细提取，并可人工复核把关',
+          f4: '支持月末批量上传与集中处理',
+          f5: '重复发票识别 + 全流程审计轨迹（原文件、提取结果、导出状态）',
+          powered_by: '基于安全的企业级基础设施',
+          terms: '服务条款',
+          privacy: '隐私政策',
+          pricing: '价格方案',
+          support: '技术支持',
+          contact: '联系我们',
+          btn_xero: '使用 Xero 继续',
+          btn_myob: '使用 MYOB 继续',
+          email: '邮箱',
+          password: '密码',
+          sign_in: '登录',
+          no_account: '还没有账户？',
+          start_trial: '立即开始 7 天免费试用',
+          lang_label: '中文 (CN)'
+        }
+      };
+
+      function setLang(lang) {
+        const dict = I18N[lang] || I18N.en;
+        document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          const key = el.getAttribute('data-i18n');
+          if (key && dict[key]) el.textContent = dict[key];
+        });
+        const lbl = document.getElementById('lang-current-label');
+        if (lbl) lbl.textContent = dict.lang_label;
+        localStorage.setItem('ledgersnaps_lang', lang);
+      }
+
+      const saved = localStorage.getItem('ledgersnaps_lang') || 'en';
+      setLang(saved);
+
+      
+
+      async function startXeroOAuth() {
+        const btn = document.getElementById('btn-xero');
+        const statusEl = document.getElementById('auth-status');
+        if (!btn) return;
+        try {
+          btn.classList.add('btn-loading');
+          if (statusEl) statusEl.textContent = document.documentElement.lang === 'zh-CN' ? '正在跳转到 Xero 授权…' : 'Redirecting to Xero authorization…';
+          const r = await fetch('/api/v1/auth/xero/start', { credentials: 'same-origin' });
+          const j = await r.json();
+          if (!r.ok || !j.url) {
+            throw new Error((j && j.detail) ? j.detail : 'xero_start_failed');
+          }
+          window.location.href = j.url;
+        } catch (e) {
+          if (statusEl) statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? 'Xero 登录暂不可用：' : 'Xero sign-in unavailable: ') + String(e.message || e);
+          btn.classList.remove('btn-loading');
+        }
+      }
+
+      const xeroBtn = document.getElementById('btn-xero');
+      if (xeroBtn) {
+        xeroBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          startXeroOAuth();
+        });
+      }
+
+      const myobBtn = document.getElementById('btn-myob');
+      if (myobBtn) {
+        myobBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const statusEl = document.getElementById('auth-status');
+          if (statusEl) statusEl.textContent = document.documentElement.lang === 'zh-CN' ? 'MYOB 即将接入，下一步完成。' : 'MYOB flow will be enabled next.';
+        });
+      }
+
+      document.querySelectorAll('[data-lang]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const lang = btn.getAttribute('data-lang') || 'en';
+          setLang(lang);
+          const details = btn.closest('details');
+          if (details) details.removeAttribute('open');
+        });
+      });
+    })();
+  </script>
+
+</body>
+</html>
