@@ -11,48 +11,72 @@
   <style>
     body { font-family: 'Sora', sans-serif; }
     .left-bg { background-image: linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser.png'); background-size: cover; background-position: center; }
+    .lang-menu[hidden] { display: none; }
   </style>
 </head>
 <body class="min-h-screen bg-[#060C1A] text-white left-bg">
   <div class="min-h-screen flex flex-col">
     <header class="px-6 md:px-10 py-6 border-b border-white/10">
-      <div class="max-w-6xl mx-auto flex items-center justify-between">
-        <a href="/" class="flex items-center gap-3">
-          <img src="/assets/images/logo-transparent.png" alt="Ledgersnaps mark" class="h-9 w-auto" />
-          <span class="text-sm tracking-[0.18em] font-semibold">LEDGERSNAPS</span>
+      <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+        <a href="/" class="flex items-center gap-3 min-w-0">
+          <img src="/assets/images/logo-lockup-ledgersnaps.svg" alt="LedgerSnaps logo" class="h-10 md:h-12 w-auto" />
         </a>
-        <a href="/" class="text-xs text-neutral-300 hover:text-white transition-colors">Back to home</a>
+        <div class="relative text-xs text-neutral-300">
+          <button id="langBtn" class="hover:text-white transition-colors">🌐 <span id="langLabel">English (AU)</span> ▾</button>
+          <div id="langMenu" class="lang-menu absolute right-0 mt-2 w-36 rounded-md border border-white/15 bg-[#0d1426] p-1" hidden>
+            <button class="w-full text-left px-2 py-1 hover:bg-white/10 rounded" data-lang="en">🇦🇺 English (AU)</button>
+            <button class="w-full text-left px-2 py-1 hover:bg-white/10 rounded" data-lang="cn">🇨🇳 中文 (CN)</button>
+          </div>
+        </div>
       </div>
     </header>
     <main class="flex-1 px-6 md:px-10 py-10">
       <article class="max-w-4xl mx-auto rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-6 md:p-10">
         
-<h1 class="text-2xl md:text-3xl font-semibold mb-3">Terms & Conditions</h1>
-<p class="text-sm text-neutral-300 mb-8">Effective date: 2026-10-05</p>
+<h1 class="text-2xl md:text-3xl font-semibold mb-8" data-i18n="title">Terms & Conditions</h1>
 <div class="space-y-6 text-sm leading-7 text-neutral-100/95">
-  <section><h2 class="text-lg font-semibold mb-2">1. Service scope</h2><p>LedgerSnaps provides invoice data extraction and accounting workflow support features. Features may change as the product evolves.</p></section>
-  <section><h2 class="text-lg font-semibold mb-2">2. Account responsibilities</h2><p>You are responsible for account security, lawful usage, and ensuring uploaded data is authorized for processing.</p></section>
-  <section><h2 class="text-lg font-semibold mb-2">3. Billing and trials</h2><p>Trial credits, paid plans, and top-up credits are subject to plan terms presented at purchase. Fees are non-refundable unless required by law.</p></section>
-  <section><h2 class="text-lg font-semibold mb-2">4. Availability and limitations</h2><p>Service availability depends on third-party infrastructure and upstream providers. We do not guarantee uninterrupted operation.</p></section>
-  <section><h2 class="text-lg font-semibold mb-2">5. Acceptable use</h2><p>You must not use the service for unlawful, abusive, or fraudulent activity. We may suspend accounts that violate policy.</p></section>
-  <section><h2 class="text-lg font-semibold mb-2">6. Liability</h2><p>To the extent allowed by law, LedgerSnaps is not liable for indirect or consequential damages from use of the service.</p></section>
-  <section><h2 class="text-lg font-semibold mb-2">7. Contact</h2><p>For terms questions, contact: <a class="underline" href="mailto:legal@ledgersnaps.com">legal@ledgersnaps.com</a></p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h1">1. Service scope</h2><p data-i18n="p1">LedgerSnaps provides invoice data extraction and accounting workflow support features. Features may change as the product evolves.</p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h2">2. Account responsibilities</h2><p data-i18n="p2">You are responsible for account security, lawful usage, and ensuring uploaded data is authorized for processing.</p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h3">3. Billing and trials</h2><p data-i18n="p3">Trial credits, paid plans, and top-up credits are subject to plan terms presented at purchase. Fees are non-refundable unless required by law.</p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h4">4. Availability and limitations</h2><p data-i18n="p4">Service availability depends on third-party infrastructure and upstream providers. We do not guarantee uninterrupted operation.</p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h5">5. Acceptable use</h2><p data-i18n="p5">You must not use the service for unlawful, abusive, or fraudulent activity. We may suspend accounts that violate policy.</p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h6">6. Liability</h2><p data-i18n="p6">To the extent allowed by law, LedgerSnaps is not liable for indirect or consequential damages from use of the service.</p></section>
+  <section><h2 class="text-lg font-semibold mb-2" data-i18n="h7">7. Contact</h2><p><span data-i18n="p7">For terms questions, contact:</span> <a class="underline" href="mailto:legal@ledgersnaps.com">legal@ledgersnaps.com</a></p></section>
 </div>
 
       </article>
     </main>
     <footer class="px-6 md:px-10 py-6 border-t border-white/10 text-xs text-neutral-300">
       <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        <div>© 2026 LedgerSnaps Inc. All rights reserved.</div>
+        <div data-i18n="copyright">© 2026 LedgerSnaps Inc. All rights reserved.</div>
         <div class="flex items-center gap-4">
-          <a href="/terms" class="hover:text-white">Terms & Conditions</a>
-          <a href="/privacy" class="hover:text-white">Privacy</a>
-          <a href="/pricing" class="hover:text-white">Pricing</a>
-          <a href="#" class="hover:text-white">Support</a>
-          <a href="#" class="hover:text-white">Contact Us</a>
+          <a href="/terms" class="hover:text-white" data-i18n="terms">Terms & Conditions</a>
+          <a href="/privacy" class="hover:text-white" data-i18n="privacy">Privacy</a>
+          <a href="/pricing" class="hover:text-white" data-i18n="pricing">Pricing</a>
+          <a href="#" class="hover:text-white" data-i18n="support">Support</a>
+          <a href="#" class="hover:text-white" data-i18n="contact">Contact Us</a>
         </div>
       </div>
     </footer>
   </div>
+<script>
+const dict = {"en": {"title": "Terms & Conditions", "h1": "1. Service scope", "p1": "LedgerSnaps provides invoice data extraction and accounting workflow support features. Features may change as the product evolves.", "h2": "2. Account responsibilities", "p2": "You are responsible for account security, lawful usage, and ensuring uploaded data is authorized for processing.", "h3": "3. Billing and trials", "p3": "Trial credits, paid plans, and top-up credits are subject to plan terms presented at purchase. Fees are non-refundable unless required by law.", "h4": "4. Availability and limitations", "p4": "Service availability depends on third-party infrastructure and upstream providers. We do not guarantee uninterrupted operation.", "h5": "5. Acceptable use", "p5": "You must not use the service for unlawful, abusive, or fraudulent activity. We may suspend accounts that violate policy.", "h6": "6. Liability", "p6": "To the extent allowed by law, LedgerSnaps is not liable for indirect or consequential damages from use of the service.", "h7": "7. Contact", "p7": "For terms questions, contact:", "copyright": "© 2026 LedgerSnaps Inc. All rights reserved.", "terms": "Terms & Conditions", "privacy": "Privacy", "pricing": "Pricing", "support": "Support", "contact": "Contact Us"}, "cn": {"title": "条款与条件", "h1": "1. 服务范围", "p1": "LedgerSnaps 提供发票数据提取与会计流程支持功能，功能可能随产品迭代调整。", "h2": "2. 账户责任", "p2": "你需要对账户安全、合法使用以及上传数据的处理授权负责。", "h3": "3. 计费与试用", "p3": "试用额度、付费计划与充值额度以购买时展示的条款为准；除法律另有规定外，费用不予退还。", "h4": "4. 可用性与限制", "p4": "服务可用性依赖第三方基础设施与上游服务，我们不保证服务持续不中断。", "h5": "5. 可接受使用", "p5": "你不得将服务用于违法、滥用或欺诈活动；违反政策的账户可能被暂停。", "h6": "6. 责任限制", "p6": "在法律允许范围内，LedgerSnaps 不对使用服务导致的间接或后果性损失承担责任。", "h7": "7. 联系方式", "p7": "条款相关问题请联系：", "copyright": "© 2026 LedgerSnaps Inc. 版权所有。", "terms": "条款与条件", "privacy": "隐私", "pricing": "定价", "support": "支持", "contact": "联系我们"}};
+function setLang(lang) {
+  const t = dict[lang] || dict.en;
+  document.documentElement.lang = lang === 'cn' ? 'zh' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (t[k]) el.textContent = t[k];
+  });
+  document.getElementById('langLabel').textContent = lang === 'cn' ? '中文 (CN)' : 'English (AU)';
+  localStorage.setItem('ledgersnaps_lang', lang);
+}
+const btn = document.getElementById('langBtn');
+const menu = document.getElementById('langMenu');
+btn.addEventListener('click', () => menu.hidden = !menu.hidden);
+document.querySelectorAll('[data-lang]').forEach(x => x.addEventListener('click', () => { setLang(x.dataset.lang); menu.hidden = true; }));
+document.addEventListener('click', (e) => { if (!btn.contains(e.target) && !menu.contains(e.target)) menu.hidden = true; });
+setLang(localStorage.getItem('ledgersnaps_lang') || 'en');
+</script>
 </body>
 </html>
