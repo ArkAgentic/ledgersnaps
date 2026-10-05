@@ -243,6 +243,120 @@ def _build_validation_warnings(target: Literal["xero", "myob"], invoice: Invoice
     return warnings
 
 
+@app.get("/auth/xero/callback", response_class=HTMLResponse)
+async def xero_callback_page() -> HTMLResponse:
+    html = """
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Xero Sign-in</title></head>
+<body style='font-family:system-ui;max-width:680px;margin:40px auto;padding:0 16px;color:#111'>
+<h2>Connecting Xero...</h2>
+<p id='msg' style='color:#555'>Please wait while we complete sign-in.</p>
+<script>
+(async function(){
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const msg = document.getElementById('msg');
+  if(!code || !state){ msg.textContent='Missing OAuth code/state.'; return; }
+  try{
+    const r = await fetch(`/api/v1/auth/xero/callback/public?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
+    const j = await r.json();
+    if(!r.ok){ throw new Error(j.detail || 'xero_callback_failed'); }
+
+    if(j.status === 'signed_in' && j.token){
+      try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+      document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+      msg.textContent='Signed in. Redirecting...';
+      location.href = j.redirect || '/';
+      return;
+    }
+
+    if(j.status === 'signup_required' && j.oauth_session_token){
+      const q = new URLSearchParams();
+      q.set('oauth_session_token', j.oauth_session_token);
+      if(j.prefill && j.prefill.email) q.set('email', j.prefill.email);
+      if(j.prefill && j.prefill.full_name) q.set('full_name', j.prefill.full_name);
+      location.href = '/signup/complete?' + q.toString();
+      return;
+    }
+
+    throw new Error('unexpected_callback_payload');
+  }catch(e){
+    msg.textContent = 'Xero sign-in failed: ' + String(e.message || e);
+  }
+})();
+</script>
+</body></html>
+"""
+    return HTMLResponse(content=html)
+
+
+@app.get("/signup/complete", response_class=HTMLResponse)
+async def signup_complete_page() -> HTMLResponse:
+    html = """
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Complete Signup</title></head>
+<body style='font-family:system-ui;max-width:680px;margin:40px auto;padding:0 16px;color:#111'>
+<h2>Complete your account setup</h2>
+<p style='color:#555'>We need your Australian mobile verification before starting trial.</p>
+<form id='f' style='display:grid;gap:10px;max-width:460px'>
+  <input id='user_id' placeholder='User ID (e.g. your email prefix)' required />
+  <input id='email' placeholder='Email' type='email' required />
+  <input id='full_name' placeholder='Full name' required />
+  <input id='phone' placeholder='+61400111222' required />
+  <div style='display:flex;gap:8px'>
+    <input id='otp' placeholder='OTP code' required style='flex:1' />
+    <button id='send' type='button'>Send OTP</button>
+  </div>
+  <button type='submit'>Complete Signup</button>
+</form>
+<p id='msg' style='margin-top:12px;color:#555'></p>
+<script>
+const params = new URLSearchParams(location.search);
+const tok = params.get('oauth_session_token') || '';
+if(params.get('email')) document.getElementById('email').value = params.get('email');
+if(params.get('full_name')) document.getElementById('full_name').value = params.get('full_name');
+
+const msg = document.getElementById('msg');
+
+document.getElementById('send').addEventListener('click', async ()=>{
+  const phone = document.getElementById('phone').value.trim();
+  if(!phone){ msg.textContent='Phone required'; return; }
+  const r = await fetch(`/api/v1/auth/phone/send-code?phone_e164=${encodeURIComponent(phone)}`, {method:'POST'});
+  const j = await r.json();
+  if(!r.ok){ msg.textContent='Send OTP failed: '+(j.detail||''); return; }
+  msg.textContent = 'OTP sent.' + (j.dev_code ? (' Dev code: '+j.dev_code) : '');
+  if(j.dev_code) document.getElementById('otp').value = j.dev_code;
+});
+
+document.getElementById('f').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!tok){ msg.textContent='Missing oauth session token'; return; }
+  const q = new URLSearchParams({
+    oauth_session_token: tok,
+    user_id: document.getElementById('user_id').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    full_name: document.getElementById('full_name').value.trim(),
+    phone_e164: document.getElementById('phone').value.trim(),
+    phone_otp_code: document.getElementById('otp').value.trim(),
+    device_fingerprint: 'web-signup-complete'
+  });
+  const r = await fetch('/api/v1/auth/oauth/complete-signup?'+q.toString(), {method:'POST'});
+  const j = await r.json();
+  if(!r.ok){ msg.textContent = 'Signup failed: '+(j.detail||''); return; }
+  if(j.token){
+    try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+    document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+  }
+  msg.textContent = 'Signup complete. Redirecting...';
+  location.href = j.redirect || '/';
+});
+</script>
+</body></html>
+"""
+    return HTMLResponse(content=html)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def playground() -> HTMLResponse:
     html = """
