@@ -16,7 +16,7 @@
 </head>
 <body class="min-h-screen bg-[#060C1A] text-white left-bg">
   <div class="min-h-screen flex flex-col">
-    <header class="px-6 md:px-10 py-6 border-b border-white/10">
+    <header class="px-8 md:px-16 lg:px-20 py-6 border-b border-white/10">
       <div class="max-w-6xl mx-auto flex items-center">
         <a href="/" class="flex items-center gap-3 min-w-0">
           <div class="flex items-center gap-3">
@@ -26,8 +26,8 @@
         </a>
       </div>
     </header>
-    <main class="flex-1 px-6 md:px-10 py-10">
-      <article class="max-w-4xl mx-auto rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-6 md:p-10">
+    <main class="flex-1 px-8 md:px-16 lg:px-20 py-10">
+      <article class="max-w-5xl mx-auto rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-7 md:p-10">
         
 <h1 class="text-2xl md:text-3xl font-semibold mb-8" data-i18n="title">Privacy Policy</h1>
 <div class="space-y-6 text-sm leading-7 text-neutral-100/95">
@@ -41,10 +41,10 @@
 
       </article>
     </main>
-    {{FOOTER_SHARED}}
+    <div class="px-8 md:px-16 lg:px-20 pb-6">{{FOOTER_SHARED}}</div>
   </div>
 <script>
-const dict = {"en": {"title": "Privacy Policy", "h1": "1. What we collect", "p1": "We collect account data (name, email, phone), authentication data (including OAuth identifiers), invoice metadata and extraction outputs, service usage logs, and security telemetry required to operate LedgerSnaps.", "h2": "2. How we use data", "p2": "We use data to authenticate users, process invoice extraction, create draft records in connected systems, provide support, prevent abuse, and improve service reliability.", "h3": "3. Third-party services", "p3": "We may process data through trusted providers required for service delivery, such as cloud infrastructure, payment processing, email, and connected accounting platforms (including Xero when you authorize it).", "h4": "4. Data retention and security", "p4": "We retain data only as needed for legal, operational, and security purposes. We apply access controls, encryption in transit, and secure secret handling for production systems.", "h5": "5. Your rights", "p5": "You can request access, correction, deletion, or export of your personal data where applicable. You can also revoke connected app permissions in your provider account settings.", "h6": "6. Contact", "p6": "For privacy requests, contact:", "copyright": "© 2026 LedgerSnaps Inc. All rights reserved. ABN: 92 627 301 153", "terms": "Terms & Conditions", "privacy": "Privacy", "pricing": "Pricing", "support": "Support", "contact": "Contact Us"}, "zh": {"title": "隐私政策", "h1": "1. 我们收集的信息", "p1": "我们会收集账户信息（姓名、邮箱、手机号）、认证信息（包括 OAuth 标识）、发票元数据与提取结果、服务使用日志以及维持 LedgerSnaps 运行所需的安全遥测信息。", "h2": "2. 信息使用目的", "p2": "我们使用这些数据进行身份验证、发票提取处理、在已连接系统中创建草稿记录、提供客户支持、防止滥用并提升服务稳定性。", "h3": "3. 第三方服务", "p3": "在提供服务所必需的场景下，我们可能通过可信第三方处理数据，例如云基础设施、支付、邮件服务以及已授权的会计平台（包括 Xero）。", "h4": "4. 数据留存与安全", "p4": "我们仅在法律、运营与安全所需范围内保留数据，并采用访问控制、传输加密及生产环境密钥安全管理。", "h5": "5. 你的权利", "p5": "在适用法律范围内，你可申请访问、更正、删除或导出个人数据；你也可以在第三方平台账户设置中撤销应用授权。", "h6": "6. 联系方式", "p6": "隐私相关请求请联系：", "copyright": "© 2026 LedgerSnaps Inc. 版权所有。ABN: 92 627 301 153", "terms": "条款与条件", "privacy": "隐私", "pricing": "定价", "support": "支持", "contact": "联系我们"}};
+const dict = {"en": {"title": "Privacy Policy", "h1": "1. What we collect", "p1": "We collect account data (name, email, phone), authentication data (including OAuth identifiers), invoice metadata and extraction outputs, service usage logs, and security telemetry required to operate LedgerSnaps.", "h2": "2. How we use data", "p2": "We use data to authenticate users, process invoice extraction, create draft records in connected systems, provide support, prevent abuse, and improve service reliability.", "h3": "3. Third-party services", "p3": "We may process data through trusted providers required for service delivery, such as cloud infrastructure, payment processing, email, and connected accounting platforms (including Xero when you authorize it).", "h4": "4. Data retention and security", "p4": "We retain data only as needed for legal, operational, and security purposes. We apply access controls, encryption in transit, and secure secret handling for production systems.", "h5": "5. Your rights", "p5": "You can request access, correction, deletion, or export of your personal data where applicable. You can also revoke connected app permissions in your provider account settings.", "h6": "6. Contact", "p6": "For privacy requests, contact:", "copyright": "© 2026 LedgerSnaps Inc. All rights reserved. · ABN: 92 627 301 153", "terms": "Terms & Conditions", "privacy": "Privacy", "pricing": "Pricing", "support": "Support", "contact": "Contact Us"}, "zh": {"title": "隐私政策", "h1": "1. 我们收集的信息", "p1": "我们会收集账户信息（姓名、邮箱、手机号）、认证信息（包括 OAuth 标识）、发票元数据与提取结果、服务使用日志以及维持 LedgerSnaps 运行所需的安全遥测信息。", "h2": "2. 信息使用目的", "p2": "我们使用这些数据进行身份验证、发票提取处理、在已连接系统中创建草稿记录、提供客户支持、防止滥用并提升服务稳定性。", "h3": "3. 第三方服务", "p3": "在提供服务所必需的场景下，我们可能通过可信第三方处理数据，例如云基础设施、支付、邮件服务以及已授权的会计平台（包括 Xero）。", "h4": "4. 数据留存与安全", "p4": "我们仅在法律、运营与安全所需范围内保留数据，并采用访问控制、传输加密及生产环境密钥安全管理。", "h5": "5. 你的权利", "p5": "在适用法律范围内，你可申请访问、更正、删除或导出个人数据；你也可以在第三方平台账户设置中撤销应用授权。", "h6": "6. 联系方式", "p6": "隐私相关请求请联系：", "copyright": "© 2026 LedgerSnaps Inc. 版权所有。 · ABN: 92 627 301 153", "terms": "条款与条件", "privacy": "隐私", "pricing": "定价", "support": "支持", "contact": "联系我们"}};
 function setLang(lang) {
   const t = dict[lang] || dict.en;
   document.documentElement.lang = lang === 'cn' ? 'zh' : 'en';
