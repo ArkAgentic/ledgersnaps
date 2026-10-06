@@ -364,10 +364,15 @@ document.getElementById('f').addEventListener('submit', async (e)=>{
 
 
 def _render_template_or_500(name: str, missing_code: str) -> HTMLResponse:
-    template = Path(__file__).resolve().parents[1] / "app" / "templates" / name
+    templates_dir = Path(__file__).resolve().parents[1] / "app" / "templates"
+    template = templates_dir / name
     if not template.exists():
         raise HTTPException(status_code=500, detail=missing_code)
-    return HTMLResponse(content=template.read_text(encoding="utf-8"))
+    html = template.read_text(encoding="utf-8")
+    footer_partial = templates_dir / "partials" / "footer-shared.html"
+    if "{{FOOTER_SHARED}}" in html and footer_partial.exists():
+        html = html.replace("{{FOOTER_SHARED}}", footer_partial.read_text(encoding="utf-8"))
+    return HTMLResponse(content=html)
 
 
 @app.get("/", response_class=HTMLResponse)
