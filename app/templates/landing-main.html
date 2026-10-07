@@ -164,6 +164,7 @@
     </section>
   </main>
 
+  <script src="/assets/js/fade-through.js"></script>
   <script>
     (() => {
       const I18N = {
@@ -308,8 +309,29 @@
         if (resetStatus) resetStatus.textContent = '';
       }
 
-      if (forgotLink) forgotLink.addEventListener('click', (e) => { e.preventDefault(); showResetMode(); });
-      if (backBtn) backBtn.addEventListener('click', (e) => { e.preventDefault(); showSigninMode(); });
+      if (forgotLink) forgotLink.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (window.FadeThrough && signupCta && resetPanel) {
+          await window.FadeThrough.swap({ outEl: signupCta, inEl: resetPanel, onBeforeIn: () => {
+            if (passwordRow) passwordRow.classList.add('hidden');
+            if (signInBtn) signInBtn.classList.add('hidden');
+          }});
+        } else {
+          showResetMode();
+        }
+      });
+      if (backBtn) backBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (window.FadeThrough && resetPanel && signupCta) {
+          await window.FadeThrough.swap({ outEl: resetPanel, inEl: signupCta, onBeforeIn: () => {
+            if (passwordRow) passwordRow.classList.remove('hidden');
+            if (signInBtn) signInBtn.classList.remove('hidden');
+            if (resetStatus) resetStatus.textContent = '';
+          }});
+        } else {
+          showSigninMode();
+        }
+      });
 
       document.querySelectorAll('[data-lang]').forEach((btn) => {
         btn.addEventListener('click', () => {
