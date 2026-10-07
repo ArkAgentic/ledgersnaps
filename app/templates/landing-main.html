@@ -77,6 +77,12 @@
     .auth-panel-enter {
       opacity: 0;
     }
+    .input-error {
+      border-color: #dc2626 !important;
+      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+    }
+    .status-error { color: #dc2626; }
+    .status-success { color: #16a34a; }
   </style>
 </head>
 <body class="bg-white text-neutral-900">
@@ -206,7 +212,7 @@
           </label>
           <button id="btn-create-account" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="create_account">Create account</button>
           <button type="button" id="back-from-create" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
-          <p id="create-status" class="text-sm text-neutral-600"></p>
+          <p id="create-status" class="text-sm min-h-[20px]"></p>
         </div>
 
       </div>
@@ -443,80 +449,144 @@
 
       if (createAccountBtn) createAccountBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        const name = (document.getElementById('create-name-input') || {}).value || '';
-        const email = (document.getElementById('create-email-input') || {}).value || '';
-        const phoneUi = (document.getElementById('create-phone-input') || {}).value || '';
+        const nameInput = document.getElementById('create-name-input');
+        const emailInput = document.getElementById('create-email-input');
+        const phoneInput = document.getElementById('create-phone-input');
+        const pwdInput = document.getElementById('create-password-input');
+        const pwd2Input = document.getElementById('create-password-confirm-input');
+        const termsInput = document.getElementById('accept-terms-checkbox');
+
+        const markError = (el) => { if (el) el.classList.add('input-error'); };
+        const clearError = (el) => { if (el) el.classList.remove('input-error'); };
+        [nameInput, emailInput, phoneInput, pwdInput, pwd2Input, termsInput].forEach(clearError);
+
+        const setCreateStatus = (msg, kind) => {
+          if (!createStatus) return;
+          createStatus.classList.remove('status-error', 'status-success');
+          if (kind === 'error') createStatus.classList.add('status-error');
+          if (kind === 'success') createStatus.classList.add('status-success');
+          createStatus.textContent = msg || '';
+        };
+
+        const name = (nameInput || {}).value || '';
+        const email = (emailInput || {}).value || '';
+        const phoneUi = (phoneInput || {}).value || '';
         const phoneDigits = String(phoneUi).replace(/\D/g, '');
         const phoneLocal = phoneDigits;
-        const pwd = (document.getElementById('create-password-input') || {}).value || '';
-        const pwd2 = (document.getElementById('create-password-confirm-input') || {}).value || '';
-        const accepted = !!((document.getElementById('accept-terms-checkbox') || {}).checked);
+        const pwd = (pwdInput || {}).value || '';
+        const pwd2 = (pwd2Input || {}).value || '';
+        const accepted = !!((termsInput || {}).checked);
         const phonePattern = /^\d{9}$/;
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        if (createStatus) {
-          if (!name.trim() || !email.trim()) {
-            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请填写姓名和邮箱。' : 'Please enter your name and email.';
-            return;
-          }
-          if (!phonePattern.test(phoneLocal.trim())) {
-            createStatus.textContent = document.documentElement.lang === 'zh-CN'
-              ? '手机号格式必须为 +61 后跟 9 位数字（仅填后 9 位）。'
-              : 'Phone must be +61 followed by 9 digits (enter 9 digits only).';
-            return;
-          }
-          if (!pwd || !pwd2) {
-            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请完整输入两次密码。' : 'Please enter password twice.';
-            return;
-          }
-          if (pwd !== pwd2) {
-            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '两次输入的密码不一致。' : 'Passwords do not match.';
-            return;
-          }
-          if (!accepted) {
-            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.';
-            return;
-          }
+        if (!name.trim()) {
+          markError(nameInput);
+          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请填写姓名。' : 'Please enter your full name.', 'error');
+          return;
+        }
+        if (!emailPattern.test(String(email).trim())) {
+          markError(emailInput);
+          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请输入有效的邮箱地址。' : 'Please enter a valid email address.', 'error');
+          return;
+        }
+        if (!phonePattern.test(phoneLocal.trim())) {
+          markError(phoneInput);
+          setCreateStatus(document.documentElement.lang === 'zh-CN'
+            ? '请输入正确手机号（+61 后 9 位数字）。'
+            : 'Please enter a valid phone number (9 digits after +61).', 'error');
+          return;
+        }
+        if (!pwd || pwd.length < 8) {
+          markError(pwdInput);
+          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '密码至少需要 8 位。' : 'Password must be at least 8 characters.', 'error');
+          return;
+        }
+        if (!pwd2) {
+          markError(pwd2Input);
+          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请再次输入密码。' : 'Please re-enter your password.', 'error');
+          return;
+        }
+        if (pwd !== pwd2) {
+          markError(pwdInput);
+          markError(pwd2Input);
+          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '两次输入的密码不一致。' : 'Passwords do not match.', 'error');
+          return;
+        }
+        if (!accepted) {
+          markError(termsInput);
+          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.', 'error');
+          return;
+        }
 
-          try {
-            const q = new URLSearchParams({
-              full_name: name.trim(),
-              email: email.trim(),
-              phone_local: phoneLocal,
-              password: pwd,
-              accept_terms: 'true',
-            });
-            const r = await fetch('/api/v1/auth/signup?' + q.toString(), { method: 'POST' });
-            const j = await r.json();
-            const detailText = (() => {
-              const d = j && j.detail;
-              if (typeof d === 'string') return d;
-              if (Array.isArray(d)) {
-                return d.map((x) => {
-                  if (typeof x === 'string') return x;
-                  if (x && typeof x.msg === 'string') return x.msg;
-                  return JSON.stringify(x);
-                }).join('; ');
-              }
-              if (d && typeof d === 'object') {
-                if (typeof d.message === 'string') return d.message;
-                return JSON.stringify(d);
-              }
-              return '';
-            })();
-            if (!r.ok || !(j.status === 'verification_sent' || j.status === 'signed_up')) throw new Error(detailText || 'signup_failed');
-            if (j.status === 'signed_up' && j.token) {
-              try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
-              document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
-              createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '创建成功，正在跳转…' : 'Account created. Redirecting...';
-              window.location.href = j.redirect || '/dashboard/upload';
-              return;
+        try {
+          const q = new URLSearchParams({
+            full_name: name.trim(),
+            email: email.trim(),
+            phone_local: phoneLocal,
+            password: pwd,
+            accept_terms: 'true',
+          });
+          const r = await fetch('/api/v1/auth/signup?' + q.toString(), { method: 'POST' });
+          const j = await r.json();
+          const detailText = (() => {
+            const d = j && j.detail;
+            if (typeof d === 'string') return d;
+            if (Array.isArray(d)) {
+              return d.map((x) => {
+                if (typeof x === 'string') return x;
+                if (x && typeof x.msg === 'string') return x.msg;
+                return JSON.stringify(x);
+              }).join('; ');
             }
-            createStatus.textContent = document.documentElement.lang === 'zh-CN'
-              ? '验证邮件已发送，请先去邮箱点击确认链接完成注册。'
-              : 'Verification email sent. Please confirm from your inbox to complete signup.';
-          } catch (e) {
-            createStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '注册失败：' : 'Signup failed: ') + String(e.message || e);
+            if (d && typeof d === 'object') {
+              if (typeof d.message === 'string') return d.message;
+              return JSON.stringify(d);
+            }
+            return '';
+          })();
+
+          const mapFriendly = (msg) => {
+            const m = String(msg || '');
+            if (!m) return (document.documentElement.lang === 'zh-CN' ? '注册失败，请稍后重试。' : 'Signup failed. Please try again.');
+            if (m.includes('at least 8') || m.includes('string_too_short')) {
+              markError(pwdInput);
+              return (document.documentElement.lang === 'zh-CN' ? '密码至少需要 8 位。' : 'Password must be at least 8 characters.');
+            }
+            if (m.includes('email_already_registered')) {
+              markError(emailInput);
+              return (document.documentElement.lang === 'zh-CN' ? '该邮箱已注册，请直接登录。' : 'This email is already registered. Please sign in.');
+            }
+            if (m.includes('phone_already_registered')) {
+              markError(phoneInput);
+              return (document.documentElement.lang === 'zh-CN' ? '该手机号已注册。' : 'This phone number is already registered.');
+            }
+            if (m.includes('terms_not_accepted')) {
+              markError(termsInput);
+              return (document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.');
+            }
+            if (m.includes('invalid_phone') || m.includes('9 digits')) {
+              markError(phoneInput);
+              return (document.documentElement.lang === 'zh-CN' ? '请输入正确手机号（+61 后 9 位数字）。' : 'Please enter a valid phone number (9 digits after +61).');
+            }
+            return (document.documentElement.lang === 'zh-CN' ? '注册失败，请检查信息后重试。' : 'Signup failed. Please check your details and try again.');
+          };
+
+          if (!r.ok || !(j.status === 'verification_sent' || j.status === 'signed_up')) {
+            throw new Error(mapFriendly(detailText || 'signup_failed'));
           }
+
+          if (j.status === 'signed_up' && j.token) {
+            try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+            document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+            setCreateStatus(document.documentElement.lang === 'zh-CN' ? '创建成功，正在跳转…' : 'Account created. Redirecting...', 'success');
+            window.location.href = j.redirect || '/dashboard/upload';
+            return;
+          }
+          setCreateStatus(document.documentElement.lang === 'zh-CN'
+            ? '验证邮件已发送，请先去邮箱点击确认链接完成注册。'
+            : 'Verification email sent. Please confirm from your inbox to complete signup.', 'success');
+        } catch (e) {
+          setCreateStatus(String(e.message || e), 'error');
         }
       });
       if (sendResetBtn) sendResetBtn.addEventListener('click', async (e) => {
