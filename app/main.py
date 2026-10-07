@@ -25,7 +25,7 @@ from .myob_mapper import to_myob_draft_bill
 from .otp import otp_provider
 from .queue_backend import QueueBackend, QueueMessage
 from .risk_control import check_trial_eligibility, record_trial_claim, validate_phone_e164
-from .reset_mailer import send_password_reset_email
+from .reset_mailer import send_password_reset_email, send_signup_verification_email
 from .rules import extract_invoice_rules
 from .schemas import (
     BatchExtractAndMapResponse,
@@ -44,9 +44,11 @@ from .store import (
     append_signup_audit,
     create_job,
     create_password_reset_token,
+    create_pending_signup_token,
     delete_xero_connection,
     get_oauth_identity,
     get_password_reset_token,
+    get_pending_signup_token,
     get_user_by_email,
     get_user_by_id,
     get_user_by_phone,
@@ -55,6 +57,7 @@ from .store import (
     get_job_result_owned,
     list_jobs_owned,
     mark_password_reset_token_used,
+    mark_pending_signup_token_used,
     upsert_oauth_identity,
     upsert_local_credential,
     set_job_status_owned,
@@ -942,44 +945,100 @@ async def auth_signup(
     if get_user_by_phone(phone_e164):
         raise HTTPException(status_code=409, detail="phone_already_registered")
 
-    user_id = f"u-{secrets.token_hex(8)}"
     signup_ip = request.client.host if request and request.client else None
+    user_agent = request.headers.get("user-agent") if request else None
+    accepted_at = datetime.utcnow().isoformat()
+    salt_hex, digest_hex = _hash_password(password)
+
+    raw_token = secrets.token_urlsafe(24)
+    token_hash = _sha256_hex(raw_token)
+    expires_at = (datetime.utcnow() + timedelta(minutes=30)).isoformat()
+
+    create_pending_signup_token(
+        token_hash=token_hash,
+        email=email_norm,
+        full_name=full_name,
+        phone_e164=phone_e164,
+        password_salt=salt_hex,
+        password_hash=digest_hex,
+        terms_version="v1",
+        accepted_at=accepted_at,
+        signup_ip=signup_ip,
+        user_agent=user_agent,
+        expires_at=expires_at,
+    )
 
     try:
-        # Create user profile + entitlement shell through existing trial path.
+        host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
+        scheme = (request.url.scheme if request else "https") or "https"
+        verify_link = f"{scheme}://{host}/api/v1/auth/signup/verify?token={raw_token}"
+        send_signup_verification_email(to_email=email_norm, verify_link=verify_link)
+    except Exception:
+        pass
+
+    out = {"status": "verification_sent"}
+    if os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower() == "dev":
+        out["dev_verify_token"] = raw_token
+    return out
+
+
+@app.get("/api/v1/auth/signup/verify")
+async def auth_signup_verify(request: Request, token: str = Query(..., min_length=12)) -> dict:
+    token_hash = _sha256_hex(token)
+    rec = get_pending_signup_token(token_hash)
+    if not rec or str(rec.get("status")) != "pending":
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_token")
+
+    exp = str(rec.get("expires_at") or "")
+    if not exp:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_token")
+    try:
+        if datetime.utcnow() > datetime.fromisoformat(exp):
+            raise HTTPException(status_code=400, detail="invalid_or_expired_signup_token")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_token")
+
+    email_norm = str(rec.get("email") or "").strip().lower()
+    phone_e164 = str(rec.get("phone_e164") or "").strip()
+    full_name = str(rec.get("full_name") or "").strip()
+
+    if get_user_by_email(email_norm) or get_user_by_phone(phone_e164):
+        mark_pending_signup_token_used(token_hash)
+        raise HTTPException(status_code=409, detail="account_already_exists")
+
+    user_id = f"u-{secrets.token_hex(8)}"
+    try:
         record_trial_claim(
             user_id,
             phone_e164=phone_e164,
-            device_fingerprint="landing-signup",
-            signup_ip=signup_ip,
+            device_fingerprint="landing-signup-verified",
+            signup_ip=None,
             email=email_norm,
             full_name=full_name,
         )
     except ValueError as e:
-        # Map existing policy errors directly
         raise HTTPException(status_code=403, detail=str(e)) from e
 
-    salt_hex, digest_hex = _hash_password(password)
-    upsert_local_credential(user_id, password_salt=salt_hex, password_hash=digest_hex)
+    upsert_local_credential(
+        user_id,
+        password_salt=str(rec.get("password_salt") or ""),
+        password_hash=str(rec.get("password_hash") or ""),
+    )
 
     append_signup_audit(
         user_id=user_id,
         email=email_norm,
         phone_e164=phone_e164,
         accepted_terms=True,
-        terms_version="v1",
-        accepted_at=datetime.utcnow().isoformat(),
-        signup_ip=signup_ip,
-        user_agent=(request.headers.get("user-agent") if request else None),
+        terms_version=str(rec.get("terms_version") or "v1"),
+        accepted_at=str(rec.get("accepted_at") or datetime.utcnow().isoformat()),
+        signup_ip=str(rec.get("signup_ip") or "") or None,
+        user_agent=str(rec.get("user_agent") or "") or None,
     )
+    mark_pending_signup_token_used(token_hash)
 
-    token = issue_dev_token(user_id=user_id, tenant_id="default")
-    return {
-        "status": "signed_up",
-        "user_id": user_id,
-        "token": token,
-        "redirect": "/dashboard/upload",
-    }
+    token_out = issue_dev_token(user_id=user_id, tenant_id="default")
+    return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/dashboard/upload"}
 
 
 @app.post("/api/v1/auth/signin/local")

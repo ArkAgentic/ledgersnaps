@@ -487,11 +487,17 @@
             });
             const r = await fetch('/api/v1/auth/signup?' + q.toString(), { method: 'POST' });
             const j = await r.json();
-            if (!r.ok || !j.token) throw new Error(j.detail || 'signup_failed');
-            try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
-            document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
-            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '创建成功，正在跳转…' : 'Account created. Redirecting...';
-            window.location.href = j.redirect || '/dashboard/upload';
+            if (!r.ok || !(j.status === 'verification_sent' || j.status === 'signed_up')) throw new Error(j.detail || 'signup_failed');
+            if (j.status === 'signed_up' && j.token) {
+              try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+              document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+              createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '创建成功，正在跳转…' : 'Account created. Redirecting...';
+              window.location.href = j.redirect || '/dashboard/upload';
+              return;
+            }
+            createStatus.textContent = document.documentElement.lang === 'zh-CN'
+              ? '验证邮件已发送，请先去邮箱点击确认链接完成注册。'
+              : 'Verification email sent. Please confirm from your inbox to complete signup.';
           } catch (e) {
             createStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '注册失败：' : 'Signup failed: ') + String(e.message || e);
           }

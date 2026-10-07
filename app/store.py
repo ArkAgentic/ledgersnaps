@@ -183,6 +183,26 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pending_signup_tokens (
+              token_hash TEXT PRIMARY KEY,
+              email TEXT NOT NULL,
+              full_name TEXT NOT NULL,
+              phone_e164 TEXT NOT NULL,
+              password_salt TEXT NOT NULL,
+              password_hash TEXT NOT NULL,
+              terms_version TEXT NOT NULL,
+              accepted_at TEXT NOT NULL,
+              signup_ip TEXT,
+              user_agent TEXT,
+              expires_at TEXT NOT NULL,
+              status TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              used_at TEXT
+            )
+            """
+        )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
@@ -909,6 +929,81 @@ def append_signup_audit(
         conn.commit()
 
 
+def create_pending_signup_token(
+    *,
+    token_hash: str,
+    email: str,
+    full_name: str,
+    phone_e164: str,
+    password_salt: str,
+    password_hash: str,
+    terms_version: str,
+    accepted_at: str,
+    signup_ip: Optional[str],
+    user_agent: Optional[str],
+    expires_at: str,
+) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO pending_signup_tokens(
+              token_hash, email, full_name, phone_e164, password_salt, password_hash,
+              terms_version, accepted_at, signup_ip, user_agent, expires_at, status, created_at, used_at
+            )
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL)
+            """,
+            (
+                token_hash,
+                email,
+                full_name,
+                phone_e164,
+                password_salt,
+                password_hash,
+                terms_version,
+                accepted_at,
+                signup_ip,
+                user_agent,
+                expires_at,
+                "pending",
+                now,
+            ),
+        )
+        conn.commit()
+
+
+def get_pending_signup_token(token_hash: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT token_hash, email, full_name, phone_e164, password_salt, password_hash,
+               terms_version, accepted_at, signup_ip, user_agent, expires_at, status, created_at, used_at
+        FROM pending_signup_tokens
+        WHERE token_hash=?
+        LIMIT 1
+        """,
+        (token_hash,),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def mark_pending_signup_token_used(token_hash: str) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            UPDATE pending_signup_tokens
+            SET status='used', used_at=?
+            WHERE token_hash=?
+            """,
+            (now, token_hash),
+        )
+        conn.commit()
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
@@ -917,6 +1012,7 @@ def reset_all_jobs_for_tests() -> None:
         conn.execute("DELETE FROM local_credentials")
         conn.execute("DELETE FROM password_reset_tokens")
         conn.execute("DELETE FROM signup_audit")
+        conn.execute("DELETE FROM pending_signup_tokens")
         conn.execute("DELETE FROM users")
         conn.execute("DELETE FROM user_entitlements")
         conn.execute("DELETE FROM job_queue")
