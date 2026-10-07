@@ -70,6 +70,13 @@
       to { transform: translateX(-50%); }
     }
     .btn-loading { opacity: .7; pointer-events: none; }
+    .auth-panel {
+      opacity: 1;
+      transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .auth-panel-enter {
+      opacity: 0;
+    }
   </style>
 </head>
 <body class="bg-white text-neutral-900">
@@ -206,7 +213,6 @@
     </section>
   </main>
 
-  <script src="/assets/js/fade-through.js"></script>
   <script>
     (() => {
       const I18N = {
@@ -362,73 +368,46 @@
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
 
+      const PANELS = [signinCombined, resetPanel, createAccountPanel].filter(Boolean);
+      PANELS.forEach((el) => el.classList.add('auth-panel'));
+
+      function switchPanel(targetEl) {
+        PANELS.forEach((el) => el.classList.add('hidden'));
+        if (!targetEl) return;
+        targetEl.classList.remove('hidden');
+        targetEl.classList.add('auth-panel-enter');
+        requestAnimationFrame(() => targetEl.classList.remove('auth-panel-enter'));
+      }
+
       function showResetMode() {
-        if (signinCombined) signinCombined.classList.add('hidden');
-        if (signinOauth) signinOauth.classList.add('hidden');
-        if (signinSection) signinSection.classList.add('hidden');
-        if (createAccountPanel) createAccountPanel.classList.add('hidden');
-        if (resetPanel) resetPanel.classList.remove('hidden');
+        switchPanel(resetPanel);
       }
 
       function showCreateMode() {
-        if (signinCombined) signinCombined.classList.add('hidden');
-        if (signinOauth) signinOauth.classList.add('hidden');
-        if (signinSection) signinSection.classList.add('hidden');
-        if (resetPanel) resetPanel.classList.add('hidden');
-        if (createAccountPanel) createAccountPanel.classList.remove('hidden');
+        switchPanel(createAccountPanel);
       }
 
       function showSigninMode() {
-        if (signinCombined) signinCombined.classList.remove('hidden');
-        if (signinOauth) signinOauth.classList.remove('hidden');
-        if (signinSection) signinSection.classList.remove('hidden');
-        if (resetPanel) resetPanel.classList.add('hidden');
-        if (createAccountPanel) createAccountPanel.classList.add('hidden');
+        switchPanel(signinCombined);
         if (resetStatus) resetStatus.textContent = '';
         if (createStatus) createStatus.textContent = '';
       }
 
-      if (forgotLink) forgotLink.addEventListener('click', async (e) => {
+      if (forgotLink) forgotLink.addEventListener('click', (e) => {
         e.preventDefault();
-        if (window.FadeThrough && signinCombined && resetPanel) {
-          await window.FadeThrough.swap({ outEl: signinCombined, inEl: resetPanel, onBeforeIn: () => {
-            if (createAccountPanel) createAccountPanel.classList.add('hidden');
-          }});
-        } else {
-          showResetMode();
-        }
+        showResetMode();
       });
-      if (startTrialLink) startTrialLink.addEventListener('click', async (e) => {
+      if (startTrialLink) startTrialLink.addEventListener('click', (e) => {
         e.preventDefault();
-        if (window.FadeThrough && signinCombined && createAccountPanel) {
-          await window.FadeThrough.swap({ outEl: signinCombined, inEl: createAccountPanel, onBeforeIn: () => {
-            if (resetPanel) resetPanel.classList.add('hidden');
-          }});
-        } else {
-          showCreateMode();
-        }
+        showCreateMode();
       });
-      if (backBtn) backBtn.addEventListener('click', async (e) => {
+      if (backBtn) backBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (window.FadeThrough && resetPanel && signinCombined) {
-          await window.FadeThrough.swap({ outEl: resetPanel, inEl: signinCombined, onBeforeIn: () => {
-            if (createAccountPanel) createAccountPanel.classList.add('hidden');
-            if (resetStatus) resetStatus.textContent = '';
-          }});
-        } else {
-          showSigninMode();
-        }
+        showSigninMode();
       });
-      if (backFromCreateBtn) backFromCreateBtn.addEventListener('click', async (e) => {
+      if (backFromCreateBtn) backFromCreateBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (window.FadeThrough && createAccountPanel && signinCombined) {
-          await window.FadeThrough.swap({ outEl: createAccountPanel, inEl: signinCombined, onBeforeIn: () => {
-            if (resetPanel) resetPanel.classList.add('hidden');
-            if (createStatus) createStatus.textContent = '';
-          }});
-        } else {
-          showSigninMode();
-        }
+        showSigninMode();
       });
       const createPhoneInput = document.getElementById('create-phone-input');
       if (createPhoneInput) {
