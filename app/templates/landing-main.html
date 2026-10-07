@@ -441,7 +441,7 @@
         });
       }
 
-      if (createAccountBtn) createAccountBtn.addEventListener('click', (e) => {
+      if (createAccountBtn) createAccountBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         const name = (document.getElementById('create-name-input') || {}).value || '';
         const email = (document.getElementById('create-email-input') || {}).value || '';
