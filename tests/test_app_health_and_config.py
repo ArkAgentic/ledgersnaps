@@ -539,8 +539,8 @@ def test_worker_retry_then_fail_after_max_attempts():
         worker_mod.settings.retry_backoff_seconds = old_backoff
 
 
-def test_root_page_contains_logged_in_text_for_client_a_flow():
-    r = client.get("/")
+def test_playground_page_contains_logged_in_text_for_client_a_flow():
+    r = client.get("/playground")
     assert r.status_code == 200
     html = r.text
     assert "build=auth-ui-v3" in html

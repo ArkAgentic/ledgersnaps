@@ -2,6 +2,7 @@ from io import BytesIO
 import os
 import secrets
 import time
+import hashlib
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -43,10 +44,13 @@ from .store import (
     delete_xero_connection,
     get_oauth_identity,
     get_user_by_email,
+    get_user_by_phone,
+    get_local_credential,
     get_job_owned,
     get_job_result_owned,
     list_jobs_owned,
     upsert_oauth_identity,
+    upsert_local_credential,
     set_job_status_owned,
     upsert_job_result_owned,
     update_job_submission_owned,
@@ -74,6 +78,24 @@ if _ASSETS_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
 queue_backend = QueueBackend(settings.queue_backend)
 _OAUTH_SIGNUP_CACHE: dict[str, dict] = {}
+
+
+def _hash_password(password: str, *, salt_hex: Optional[str] = None, rounds: int = 120_000) -> tuple[str, str]:
+    salt = bytes.fromhex(salt_hex) if salt_hex else os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, rounds)
+    return salt.hex(), digest.hex()
+
+
+def _verify_password(password: str, *, salt_hex: str, digest_hex: str) -> bool:
+    _salt, computed = _hash_password(password, salt_hex=salt_hex)
+    return secrets.compare_digest(computed, digest_hex)
+
+
+def _normalize_signup_phone(phone_local: str) -> str:
+    digits = "".join(ch for ch in str(phone_local or "") if ch.isdigit())
+    if len(digits) != 9:
+        raise ValueError("invalid_phone_local")
+    return f"+61{digits}"
 
 
 def _current_user(
@@ -881,6 +903,89 @@ async def _extract_and_map_batch_core(
             "billable_invoice_count": ok,
         },
     )
+
+
+@app.post("/api/v1/auth/signup")
+async def auth_signup(
+    request: Request,
+    full_name: str = Query(..., min_length=1),
+    email: str = Query(..., min_length=3),
+    phone_local: str = Query(..., min_length=9),
+    password: str = Query(..., min_length=8),
+    accept_terms: bool = Query(...),
+) -> dict:
+    if not accept_terms:
+        raise HTTPException(status_code=400, detail="terms_not_accepted")
+
+    email_norm = str(email or "").strip().lower()
+    if not email_norm:
+        raise HTTPException(status_code=400, detail="email_required")
+
+    try:
+        phone_e164 = _normalize_signup_phone(phone_local)
+        _ = validate_phone_e164(phone_e164)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    if get_user_by_email(email_norm):
+        raise HTTPException(status_code=409, detail="email_already_registered")
+    if get_user_by_phone(phone_e164):
+        raise HTTPException(status_code=409, detail="phone_already_registered")
+
+    user_id = f"u-{secrets.token_hex(8)}"
+    signup_ip = request.client.host if request and request.client else None
+
+    try:
+        # Create user profile + entitlement shell through existing trial path.
+        record_trial_claim(
+            user_id,
+            phone_e164=phone_e164,
+            device_fingerprint="landing-signup",
+            signup_ip=signup_ip,
+            email=email_norm,
+            full_name=full_name,
+        )
+    except ValueError as e:
+        # Map existing policy errors directly
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+    salt_hex, digest_hex = _hash_password(password)
+    upsert_local_credential(user_id, password_salt=salt_hex, password_hash=digest_hex)
+
+    token = issue_dev_token(user_id=user_id, tenant_id="default")
+    return {
+        "status": "signed_up",
+        "user_id": user_id,
+        "token": token,
+        "redirect": "/dashboard/upload",
+    }
+
+
+@app.post("/api/v1/auth/signin/local")
+async def auth_signin_local(
+    email: str = Query(..., min_length=3),
+    password: str = Query(..., min_length=1),
+) -> dict:
+    email_norm = str(email or "").strip().lower()
+    user = get_user_by_email(email_norm)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+
+    cred = get_local_credential(str(user.get("user_id") or ""))
+    if not cred:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+
+    if not _verify_password(password, salt_hex=str(cred.get("password_salt") or ""), digest_hex=str(cred.get("password_hash") or "")):
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+
+    token = issue_dev_token(user_id=str(user.get("user_id")), tenant_id="default")
+    return {
+        "status": "signed_in",
+        "user_id": str(user.get("user_id")),
+        "token": token,
+        "redirect": "/dashboard/upload",
+    }
+
 
 
 @app.get("/api/v1/auth/dev-token")

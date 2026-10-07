@@ -143,6 +143,18 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS local_credentials (
+              user_id TEXT PRIMARY KEY,
+              password_salt TEXT NOT NULL,
+              password_hash TEXT NOT NULL,
+              algo TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
@@ -712,6 +724,55 @@ def get_oauth_identity(*, provider: str, provider_subject_id: str) -> Optional[d
     return dict(row) if row else None
 
 
+def upsert_local_credential(user_id: str, *, password_salt: str, password_hash: str, algo: str = "pbkdf2_sha256") -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO local_credentials(user_id, password_salt, password_hash, algo, created_at, updated_at)
+            VALUES(?,?,?,?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              password_salt=excluded.password_salt,
+              password_hash=excluded.password_hash,
+              algo=excluded.algo,
+              updated_at=excluded.updated_at
+            """,
+            (user_id, password_salt, password_hash, algo, now, now),
+        )
+        conn.commit()
+
+
+def get_local_credential(user_id: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT user_id, password_salt, password_hash, algo, created_at, updated_at
+        FROM local_credentials
+        WHERE user_id=?
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def get_user_by_phone(phone_e164: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+        FROM users
+        WHERE phone_e164=?
+        LIMIT 1
+        """,
+        (str(phone_e164 or "").strip(),),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
     conn = _ensure_conn()
     cur = conn.execute(
@@ -732,6 +793,7 @@ def reset_all_jobs_for_tests() -> None:
     with _DB_LOCK:
         conn.execute("DELETE FROM oauth_identities")
         conn.execute("DELETE FROM xero_connections")
+        conn.execute("DELETE FROM local_credentials")
         conn.execute("DELETE FROM users")
         conn.execute("DELETE FROM user_entitlements")
         conn.execute("DELETE FROM job_queue")

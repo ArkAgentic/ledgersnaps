@@ -72,7 +72,7 @@
     .btn-loading { opacity: .7; pointer-events: none; }
     .auth-panel {
       opacity: 1;
-      transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+      transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
     }
     .auth-panel-enter {
       opacity: 0;
@@ -341,6 +341,27 @@
         });
       }
 
+      const signInBtnEl = document.getElementById('btn-signin');
+      if (signInBtnEl) {
+        signInBtnEl.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          const email = (document.getElementById('email-input') || {}).value || '';
+          const password = (document.getElementById('password-input') || {}).value || '';
+          const statusEl = document.getElementById('auth-status');
+          try {
+            const q = new URLSearchParams({ email: String(email).trim(), password: String(password) });
+            const r = await fetch('/api/v1/auth/signin/local?' + q.toString(), { method: 'POST' });
+            const j = await r.json();
+            if (!r.ok || !j.token) throw new Error(j.detail || 'signin_failed');
+            try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+            document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+            window.location.href = j.redirect || '/dashboard/upload';
+          } catch (e) {
+            if (statusEl) statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '登录失败：' : 'Sign-in failed: ') + String(e.message || e);
+          }
+        });
+      }
+
       const myobBtn = document.getElementById('btn-myob');
       if (myobBtn) {
         myobBtn.addEventListener('click', (ev) => {
@@ -456,18 +477,24 @@
             return;
           }
 
-          // Persist normalized payload shape (no spacing in phone number)
-          const signupPayload = {
-            full_name: name.trim(),
-            email: email.trim(),
-            phone_e164: `+61${phoneLocal}`,
-            password: pwd,
-          };
-          window.__ledgersnapsSignupDraft = signupPayload;
-
-          createStatus.textContent = document.documentElement.lang === 'zh-CN'
-            ? '注册入口即将启用，请先使用 Xero 登录。'
-            : 'Signup flow will be enabled next. Please use Xero sign-in for now.';
+          try {
+            const q = new URLSearchParams({
+              full_name: name.trim(),
+              email: email.trim(),
+              phone_local: phoneLocal,
+              password: pwd,
+              accept_terms: 'true',
+            });
+            const r = await fetch('/api/v1/auth/signup?' + q.toString(), { method: 'POST' });
+            const j = await r.json();
+            if (!r.ok || !j.token) throw new Error(j.detail || 'signup_failed');
+            try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+            document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '创建成功，正在跳转…' : 'Account created. Redirecting...';
+            window.location.href = j.redirect || '/dashboard/upload';
+          } catch (e) {
+            createStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '注册失败：' : 'Signup failed: ') + String(e.message || e);
+          }
         }
       });
       if (sendResetBtn) sendResetBtn.addEventListener('click', (e) => {
