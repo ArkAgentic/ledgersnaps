@@ -25,6 +25,7 @@ from .myob_mapper import to_myob_draft_bill
 from .otp import otp_provider
 from .queue_backend import QueueBackend, QueueMessage
 from .risk_control import check_trial_eligibility, record_trial_claim, validate_phone_e164
+from .reset_mailer import send_password_reset_email
 from .rules import extract_invoice_rules
 from .schemas import (
     BatchExtractAndMapResponse,
@@ -105,16 +106,6 @@ def _normalize_signup_phone(phone_local: str) -> str:
 
 def _sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def _send_reset_via_best_channel(*, user: dict, token: str) -> None:
-    # Best effort for now: SMS via existing OTP provider dev/azure modes.
-    phone = str(user.get("phone_e164") or "").strip()
-    if phone:
-        if otp_provider.mode == "azure_sms":
-            otp_provider._send_azure_sms(phone, token)  # noqa: SLF001
-        return
-    # Email path placeholder (no SMTP provider configured yet).
 
 
 def _current_user(
@@ -1019,7 +1010,10 @@ async def auth_signin_local(
 
 
 @app.post("/api/v1/auth/password/forgot")
-async def auth_password_forgot(email: str = Query(..., min_length=3)) -> dict:
+async def auth_password_forgot(
+    request: Request,
+    email: str = Query(..., min_length=3),
+) -> dict:
     email_norm = str(email or "").strip().lower()
     user = get_user_by_email(email_norm)
     # Always return generic response to avoid account enumeration.
@@ -1031,14 +1025,18 @@ async def auth_password_forgot(email: str = Query(..., min_length=3)) -> dict:
     expires_at = (datetime.utcnow() + timedelta(minutes=20)).isoformat()
     create_password_reset_token(token_hash=token_hash, user_id=str(user.get("user_id")), expires_at=expires_at)
 
+    # Send via email when account exists; keep response generic.
     try:
-        _send_reset_via_best_channel(user=user, token=raw_token)
+        host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
+        scheme = (request.url.scheme if request else "https") or "https"
+        reset_link = f"{scheme}://{host}/reset-password?token={raw_token}"
+        send_password_reset_email(to_email=str(user.get("email") or email_norm), reset_link=reset_link)
     except Exception:
-        # do not leak channel/provider details
+        # keep outward response non-enumerating
         pass
 
     resp = {"ok": True, "status": "accepted"}
-    if otp_provider.mode == "dev":
+    if os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower() == "dev":
         # local dev visibility only
         resp["dev_reset_token"] = raw_token
     return resp

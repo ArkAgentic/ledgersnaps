@@ -13,6 +13,8 @@ class Settings(BaseModel):
     # Worker retry policy
     max_job_attempts: int = 3
     retry_backoff_seconds: int = 15
+    # Password-reset email sender (smtp | dev)
+    reset_email_provider: str = "dev"
 
 
 settings = Settings()
