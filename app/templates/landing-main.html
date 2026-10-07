@@ -138,7 +138,7 @@
 
         <div class="my-7 w-[80%] mx-auto h-px bg-neutral-300/70"></div>
 
-        <div class="space-y-4 w-[80%] mx-auto">
+        <div id="signin-fields" class="space-y-4 w-[80%] mx-auto">
           <div>
             <label class="text-sm text-neutral-700 block" data-i18n="email">Email Address</label>
             <input id="email-input" type="email" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
@@ -154,6 +154,7 @@
         <div id="reset-panel" class="hidden mt-5 w-[80%] mx-auto">
           <p class="text-sm text-neutral-600 mb-3" data-i18n="reset_hint">Enter your email to receive a password reset link.</p>
           <input id="reset-email-input" type="email" class="w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          <button id="btn-send-reset" class="mt-4 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="send_reset">Send reset link</button>
           <a href="#" id="back-to-signin" class="inline-block mt-3 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</a>
           <p id="reset-status" class="mt-3 text-sm text-neutral-600"></p>
         </div>
@@ -189,6 +190,7 @@
           sign_in: 'Sign In',
           forgot_password: 'Forgot password?',
           reset_hint: 'Enter your email to receive a password reset link.',
+          send_reset: 'Send reset link',
           back_short: 'Back',
           no_account: 'Don’t have an account yet?',
           start_trial: 'Start your 7-day free trial',
@@ -216,6 +218,7 @@
           sign_in: '登录',
           forgot_password: '忘记密码？',
           reset_hint: '输入你的邮箱，我们会发送重置密码链接。',
+          send_reset: '发送重置链接',
           back_short: '返回',
           no_account: '还没有账号吗？',
           start_trial: '开始 7 天免费试用',
@@ -289,10 +292,12 @@
       const forgotLink = document.getElementById('forgot-password-link');
       const backBtn = document.getElementById('back-to-signin');
       const resetPanel = document.getElementById('reset-panel');
+      const signinFields = document.getElementById('signin-fields');
       const passwordRow = document.getElementById('password-row');
       const signInBtn = document.getElementById('btn-signin');
       const signupCta = document.getElementById('signup-cta');
       const resetStatus = document.getElementById('reset-status');
+      const sendResetBtn = document.getElementById('btn-send-reset');
 
       function showResetMode() {
         if (passwordRow) passwordRow.classList.add('hidden');
@@ -313,6 +318,7 @@
         e.preventDefault();
         if (window.FadeThrough && signupCta && resetPanel) {
           await window.FadeThrough.swap({ outEl: signupCta, inEl: resetPanel, onBeforeIn: () => {
+            if (signinFields) signinFields.classList.add('hidden');
             if (passwordRow) passwordRow.classList.add('hidden');
             if (signInBtn) signInBtn.classList.add('hidden');
           }});
@@ -324,12 +330,22 @@
         e.preventDefault();
         if (window.FadeThrough && resetPanel && signupCta) {
           await window.FadeThrough.swap({ outEl: resetPanel, inEl: signupCta, onBeforeIn: () => {
+            if (signinFields) signinFields.classList.remove('hidden');
             if (passwordRow) passwordRow.classList.remove('hidden');
             if (signInBtn) signInBtn.classList.remove('hidden');
             if (resetStatus) resetStatus.textContent = '';
           }});
         } else {
           showSigninMode();
+        }
+      });
+      if (sendResetBtn) sendResetBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const email = (document.getElementById('reset-email-input') || {}).value || '';
+        if (resetStatus) {
+          resetStatus.textContent = email.trim()
+            ? (document.documentElement.lang === 'zh-CN' ? '若该邮箱已注册，我们会发送重置链接。' : 'If this email is registered, we will send a reset link.')
+            : (document.documentElement.lang === 'zh-CN' ? '请输入邮箱。' : 'Please enter your email.');
         }
       });
 
