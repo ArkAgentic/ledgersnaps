@@ -166,7 +166,6 @@
         </div>
 
         <div id="create-account-panel" class="hidden mt-5 w-[80%] mx-auto space-y-3">
-          <p class="text-sm text-neutral-600" data-i18n="create_hint">Create your account to start your free trial.</p>
           <div>
             <label class="text-sm text-neutral-700 block" data-i18n="full_name">Full Name</label>
             <input id="create-name-input" type="text" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
@@ -179,7 +178,7 @@
             <label class="text-sm text-neutral-700 block" data-i18n="phone_local">Phone number</label>
             <div class="mt-1 flex items-center gap-2">
               <span class="h-11 min-w-[68px] rounded-xl border border-neutral-300 px-3 inline-flex items-center justify-center text-sm text-neutral-700 bg-neutral-50">+61</span>
-              <input id="create-phone-input" type="tel" inputmode="numeric" placeholder="412345678" class="flex-1 h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+              <input id="create-phone-input" type="tel" inputmode="numeric" placeholder="412 345 678" class="flex-1 h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
             </div>
           </div>
           <div>
@@ -427,11 +426,24 @@
           showSigninMode();
         }
       });
+      const createPhoneInput = document.getElementById('create-phone-input');
+      if (createPhoneInput) {
+        createPhoneInput.addEventListener('input', () => {
+          const digits = String(createPhoneInput.value || '').replace(/\D/g, '').slice(0, 9);
+          const p1 = digits.slice(0, 3);
+          const p2 = digits.slice(3, 6);
+          const p3 = digits.slice(6, 9);
+          createPhoneInput.value = [p1, p2, p3].filter(Boolean).join(' ');
+        });
+      }
+
       if (createAccountBtn) createAccountBtn.addEventListener('click', (e) => {
         e.preventDefault();
         const name = (document.getElementById('create-name-input') || {}).value || '';
         const email = (document.getElementById('create-email-input') || {}).value || '';
-        const phoneLocal = (document.getElementById('create-phone-input') || {}).value || '';
+        const phoneUi = (document.getElementById('create-phone-input') || {}).value || '';
+        const phoneDigits = String(phoneUi).replace(/\D/g, '');
+        const phoneLocal = phoneDigits;
         const pwd = (document.getElementById('create-password-input') || {}).value || '';
         const pwd2 = (document.getElementById('create-password-confirm-input') || {}).value || '';
         const accepted = !!((document.getElementById('accept-terms-checkbox') || {}).checked);
