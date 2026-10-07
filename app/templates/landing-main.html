@@ -487,7 +487,23 @@
             });
             const r = await fetch('/api/v1/auth/signup?' + q.toString(), { method: 'POST' });
             const j = await r.json();
-            if (!r.ok || !(j.status === 'verification_sent' || j.status === 'signed_up')) throw new Error(j.detail || 'signup_failed');
+            const detailText = (() => {
+              const d = j && j.detail;
+              if (typeof d === 'string') return d;
+              if (Array.isArray(d)) {
+                return d.map((x) => {
+                  if (typeof x === 'string') return x;
+                  if (x && typeof x.msg === 'string') return x.msg;
+                  return JSON.stringify(x);
+                }).join('; ');
+              }
+              if (d && typeof d === 'object') {
+                if (typeof d.message === 'string') return d.message;
+                return JSON.stringify(d);
+              }
+              return '';
+            })();
+            if (!r.ok || !(j.status === 'verification_sent' || j.status === 'signed_up')) throw new Error(detailText || 'signup_failed');
             if (j.status === 'signed_up' && j.token) {
               try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
               document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
