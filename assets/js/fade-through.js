@@ -29,7 +29,7 @@
     // Prepare in element initial state
     apply(inEl, {
       opacity: '0',
-      transform: 'translateY(6px) scale(0.99)',
+      transform: 'scale(0.995)',
       filter: 'blur(2px)',
       transition: 'none',
     });
@@ -38,7 +38,7 @@
     apply(outEl, {
       transition: `opacity ${EXIT_DURATION_S}s ${EXIT_EASE}, transform ${EXIT_DURATION_S}s ${EXIT_EASE}, filter ${EXIT_DURATION_S}s ${EXIT_EASE}`,
       opacity: '0',
-      transform: 'translateY(-4px) scale(1)',
+      transform: 'scale(1)',
       filter: 'blur(0px)',
     });
 
@@ -51,7 +51,7 @@
     apply(inEl, {
       transition: `opacity ${ENTER_DURATION_S}s ${ENTER_EASE}, transform ${ENTER_DURATION_S}s ${ENTER_EASE}, filter ${ENTER_DURATION_S}s ${ENTER_EASE}`,
       opacity: '1',
-      transform: 'translateY(0) scale(1)',
+      transform: 'scale(1)',
       filter: 'blur(0px)',
     });
 
