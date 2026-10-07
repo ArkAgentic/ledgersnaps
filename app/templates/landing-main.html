@@ -131,12 +131,13 @@
       <div class="w-full max-w-md">
         <div class="h-2 md:h-3"></div>
 
-        <div class="space-y-4">
-          <button class="w-[80%] mx-auto h-11 rounded-xl border border-[#13B5EA] bg-[#13B5EA] text-white font-medium text-center px-4 block" id="btn-xero" data-action="xero-start" data-i18n="btn_xero">Continue with Xero</button>
-          <button class="w-[80%] mx-auto h-11 rounded-xl border border-[#6100A5] bg-[#6100A5] text-white font-medium text-center px-4 block" id="btn-myob" data-i18n="btn_myob">Continue with MYOB</button>
-        </div>
+        <div id="signin-combined">
+          <div id="signin-oauth" class="space-y-4">
+            <button class="w-[80%] mx-auto h-11 rounded-xl border border-[#13B5EA] bg-[#13B5EA] text-white font-medium text-center px-4 block" id="btn-xero" data-action="xero-start" data-i18n="btn_xero">Continue with Xero</button>
+            <button class="w-[80%] mx-auto h-11 rounded-xl border border-[#6100A5] bg-[#6100A5] text-white font-medium text-center px-4 block" id="btn-myob" data-i18n="btn_myob">Continue with MYOB</button>
+          </div>
 
-        <div id="signin-section">
+          <div id="signin-section">
           <div class="my-7 w-[80%] mx-auto h-px bg-neutral-300/70"></div>
 
           <div id="signin-fields" class="space-y-4 w-[80%] mx-auto">
@@ -153,6 +154,7 @@
           <button class="mt-6 w-[80%] mx-auto h-11 rounded-xl bg-[#E32652] text-white font-normal block" id="btn-signin" data-i18n="sign_in">Sign In</button>
 
           <p id="signup-cta" class="mt-5 w-[80%] mx-auto text-sm text-neutral-600 text-center leading-6"><span data-i18n="no_account">Don’t have an account yet?</span><br><a href="#" id="start-trial-link" class="inline-block mt-1 text-[#E32652] underline" data-i18n="start_trial">Start your 7-day free trial</a><br><a href="#" id="forgot-password-link" class="inline-block mt-2 text-neutral-600 hover:text-neutral-800 underline" data-i18n="forgot_password">Forgot password?</a></p>
+          </div>
         </div>
 
         <div id="reset-panel" class="hidden mt-5 w-[80%] mx-auto">
@@ -172,6 +174,10 @@
           <div>
             <label class="text-sm text-neutral-700 block" data-i18n="email">Email Address</label>
             <input id="create-email-input" type="email" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          </div>
+          <div>
+            <label class="text-sm text-neutral-700 block" data-i18n="phone_au">Phone (+61XXXXXXXXX)</label>
+            <input id="create-phone-input" type="tel" placeholder="+61412345678" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
           </div>
           <div>
             <label class="text-sm text-neutral-700 block" data-i18n="password">Password</label>
@@ -216,6 +222,7 @@
           create_hint: 'Create your account to start your free trial.',
           full_name: 'Full Name',
           create_account: 'Create account',
+          phone_au: 'Phone (+61XXXXXXXXX)',
           no_account: 'Don’t have an account yet?',
           start_trial: 'Start your 7-day free trial',
           lang_label: 'English (AU)',
@@ -247,6 +254,7 @@
           create_hint: '创建账户以开始你的免费试用。',
           full_name: '姓名',
           create_account: '创建账户',
+          phone_au: '手机号（+61XXXXXXXXX）',
           no_account: '还没有账号吗？',
           start_trial: '开始 7 天免费试用',
           lang_label: '中文 (CN)',
@@ -320,7 +328,9 @@
       const startTrialLink = document.getElementById('start-trial-link');
       const backBtn = document.getElementById('back-to-signin');
       const backFromCreateBtn = document.getElementById('back-from-create');
+      const signinOauth = document.getElementById('signin-oauth');
       const resetPanel = document.getElementById('reset-panel');
+      const signinCombined = document.getElementById('signin-combined');
       const createAccountPanel = document.getElementById('create-account-panel');
       const signinSection = document.getElementById('signin-section');
       const signinFields = document.getElementById('signin-fields');
@@ -333,18 +343,24 @@
       const createAccountBtn = document.getElementById('btn-create-account');
 
       function showResetMode() {
+        if (signinCombined) signinCombined.classList.add('hidden');
+        if (signinOauth) signinOauth.classList.add('hidden');
         if (signinSection) signinSection.classList.add('hidden');
         if (createAccountPanel) createAccountPanel.classList.add('hidden');
         if (resetPanel) resetPanel.classList.remove('hidden');
       }
 
       function showCreateMode() {
+        if (signinCombined) signinCombined.classList.add('hidden');
+        if (signinOauth) signinOauth.classList.add('hidden');
         if (signinSection) signinSection.classList.add('hidden');
         if (resetPanel) resetPanel.classList.add('hidden');
         if (createAccountPanel) createAccountPanel.classList.remove('hidden');
       }
 
       function showSigninMode() {
+        if (signinCombined) signinCombined.classList.remove('hidden');
+        if (signinOauth) signinOauth.classList.remove('hidden');
         if (signinSection) signinSection.classList.remove('hidden');
         if (resetPanel) resetPanel.classList.add('hidden');
         if (createAccountPanel) createAccountPanel.classList.add('hidden');
@@ -354,8 +370,8 @@
 
       if (forgotLink) forgotLink.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (window.FadeThrough && signinSection && resetPanel) {
-          await window.FadeThrough.swap({ outEl: signinSection, inEl: resetPanel, onBeforeIn: () => {
+        if (window.FadeThrough && signinCombined && resetPanel) {
+          await window.FadeThrough.swap({ outEl: signinCombined, inEl: resetPanel, onBeforeIn: () => {
             if (createAccountPanel) createAccountPanel.classList.add('hidden');
           }});
         } else {
@@ -364,8 +380,8 @@
       });
       if (startTrialLink) startTrialLink.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (window.FadeThrough && signinSection && createAccountPanel) {
-          await window.FadeThrough.swap({ outEl: signinSection, inEl: createAccountPanel, onBeforeIn: () => {
+        if (window.FadeThrough && signinCombined && createAccountPanel) {
+          await window.FadeThrough.swap({ outEl: signinCombined, inEl: createAccountPanel, onBeforeIn: () => {
             if (resetPanel) resetPanel.classList.add('hidden');
           }});
         } else {
@@ -374,8 +390,8 @@
       });
       if (backBtn) backBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (window.FadeThrough && resetPanel && signinSection) {
-          await window.FadeThrough.swap({ outEl: resetPanel, inEl: signinSection, onBeforeIn: () => {
+        if (window.FadeThrough && resetPanel && signinCombined) {
+          await window.FadeThrough.swap({ outEl: resetPanel, inEl: signinCombined, onBeforeIn: () => {
             if (createAccountPanel) createAccountPanel.classList.add('hidden');
             if (resetStatus) resetStatus.textContent = '';
           }});
@@ -385,8 +401,8 @@
       });
       if (backFromCreateBtn) backFromCreateBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (window.FadeThrough && createAccountPanel && signinSection) {
-          await window.FadeThrough.swap({ outEl: createAccountPanel, inEl: signinSection, onBeforeIn: () => {
+        if (window.FadeThrough && createAccountPanel && signinCombined) {
+          await window.FadeThrough.swap({ outEl: createAccountPanel, inEl: signinCombined, onBeforeIn: () => {
             if (resetPanel) resetPanel.classList.add('hidden');
             if (createStatus) createStatus.textContent = '';
           }});
@@ -398,10 +414,24 @@
         e.preventDefault();
         const name = (document.getElementById('create-name-input') || {}).value || '';
         const email = (document.getElementById('create-email-input') || {}).value || '';
+        const phone = (document.getElementById('create-phone-input') || {}).value || '';
+        const phonePattern = /^\+61\d{9}$/;
+
         if (createStatus) {
-          createStatus.textContent = (name.trim() && email.trim())
-            ? (document.documentElement.lang === 'zh-CN' ? '注册入口即将启用，请先使用 Xero 登录。' : 'Signup flow will be enabled next. Please use Xero sign-in for now.')
-            : (document.documentElement.lang === 'zh-CN' ? '请填写姓名和邮箱。' : 'Please enter your name and email.');
+          if (!name.trim() || !email.trim()) {
+            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请填写姓名和邮箱。' : 'Please enter your name and email.';
+            return;
+          }
+          if (!phonePattern.test(phone.trim())) {
+            createStatus.textContent = document.documentElement.lang === 'zh-CN'
+              ? '手机号格式必须为 +61 后跟 9 位数字。'
+              : 'Phone must be in +61 followed by 9 digits format.';
+            return;
+          }
+
+          createStatus.textContent = document.documentElement.lang === 'zh-CN'
+            ? '注册入口即将启用，请先使用 Xero 登录。'
+            : 'Signup flow will be enabled next. Please use Xero sign-in for now.';
         }
       });
       if (sendResetBtn) sendResetBtn.addEventListener('click', (e) => {

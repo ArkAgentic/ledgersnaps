@@ -1,6 +1,6 @@
 (function (global) {
-  const ENTER_DURATION_S = 0.42;
-  const EXIT_DURATION_S = 0.26;
+  const ENTER_DURATION_S = 0.72;
+  const EXIT_DURATION_S = 0.42;
   const ENTER_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
   const EXIT_EASE = 'cubic-bezier(0.4, 0, 1, 1)';
 
