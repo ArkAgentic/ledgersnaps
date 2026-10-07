@@ -4,6 +4,8 @@ import os
 import smtplib
 from email.message import EmailMessage
 
+from azure.communication.email import EmailClient
+
 
 def send_password_reset_email(*, to_email: str, reset_link: str) -> None:
     provider = os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower()
