@@ -155,6 +155,34 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+              token_hash TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              expires_at TEXT NOT NULL,
+              status TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              used_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signup_audit (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              email TEXT NOT NULL,
+              phone_e164 TEXT NOT NULL,
+              accepted_terms INTEGER NOT NULL,
+              terms_version TEXT NOT NULL,
+              accepted_at TEXT NOT NULL,
+              signup_ip TEXT,
+              user_agent TEXT,
+              created_at TEXT NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
@@ -788,12 +816,107 @@ def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
     return dict(row) if row else None
 
 
+def get_user_by_id(user_id: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+        FROM users
+        WHERE user_id=?
+        LIMIT 1
+        """,
+        (str(user_id or "").strip(),),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def create_password_reset_token(*, token_hash: str, user_id: str, expires_at: str) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO password_reset_tokens(token_hash, user_id, expires_at, status, created_at, used_at)
+            VALUES(?,?,?,?,?,NULL)
+            """,
+            (token_hash, user_id, expires_at, "pending", now),
+        )
+        conn.commit()
+
+
+def get_password_reset_token(token_hash: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT token_hash, user_id, expires_at, status, created_at, used_at
+        FROM password_reset_tokens
+        WHERE token_hash=?
+        LIMIT 1
+        """,
+        (token_hash,),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def mark_password_reset_token_used(token_hash: str) -> None:
+    conn = _ensure_conn()
+    now = _now_iso()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            UPDATE password_reset_tokens
+            SET status='used', used_at=?
+            WHERE token_hash=?
+            """,
+            (now, token_hash),
+        )
+        conn.commit()
+
+
+def append_signup_audit(
+    *,
+    user_id: str,
+    email: str,
+    phone_e164: str,
+    accepted_terms: bool,
+    terms_version: str,
+    accepted_at: str,
+    signup_ip: Optional[str],
+    user_agent: Optional[str],
+) -> None:
+    conn = _ensure_conn()
+    with _DB_LOCK:
+        conn.execute(
+            """
+            INSERT INTO signup_audit(id, user_id, email, phone_e164, accepted_terms, terms_version, accepted_at, signup_ip, user_agent, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()),
+                user_id,
+                email,
+                phone_e164,
+                1 if accepted_terms else 0,
+                terms_version,
+                accepted_at,
+                signup_ip,
+                user_agent,
+                _now_iso(),
+            ),
+        )
+        conn.commit()
+
+
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute("DELETE FROM oauth_identities")
         conn.execute("DELETE FROM xero_connections")
         conn.execute("DELETE FROM local_credentials")
+        conn.execute("DELETE FROM password_reset_tokens")
+        conn.execute("DELETE FROM signup_audit")
         conn.execute("DELETE FROM users")
         conn.execute("DELETE FROM user_entitlements")
         conn.execute("DELETE FROM job_queue")

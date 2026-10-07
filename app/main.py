@@ -40,15 +40,20 @@ from .schemas import (
 from .splitter import split_pdf_auto
 from .storage_backend import StorageBackend
 from .store import (
+    append_signup_audit,
     create_job,
+    create_password_reset_token,
     delete_xero_connection,
     get_oauth_identity,
+    get_password_reset_token,
     get_user_by_email,
+    get_user_by_id,
     get_user_by_phone,
     get_local_credential,
     get_job_owned,
     get_job_result_owned,
     list_jobs_owned,
+    mark_password_reset_token_used,
     upsert_oauth_identity,
     upsert_local_credential,
     set_job_status_owned,
@@ -96,6 +101,20 @@ def _normalize_signup_phone(phone_local: str) -> str:
     if len(digits) != 9:
         raise ValueError("invalid_phone_local")
     return f"+61{digits}"
+
+
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _send_reset_via_best_channel(*, user: dict, token: str) -> None:
+    # Best effort for now: SMS via existing OTP provider dev/azure modes.
+    phone = str(user.get("phone_e164") or "").strip()
+    if phone:
+        if otp_provider.mode == "azure_sms":
+            otp_provider._send_azure_sms(phone, token)  # noqa: SLF001
+        return
+    # Email path placeholder (no SMTP provider configured yet).
 
 
 def _current_user(
@@ -952,6 +971,17 @@ async def auth_signup(
     salt_hex, digest_hex = _hash_password(password)
     upsert_local_credential(user_id, password_salt=salt_hex, password_hash=digest_hex)
 
+    append_signup_audit(
+        user_id=user_id,
+        email=email_norm,
+        phone_e164=phone_e164,
+        accepted_terms=True,
+        terms_version="v1",
+        accepted_at=datetime.utcnow().isoformat(),
+        signup_ip=signup_ip,
+        user_agent=(request.headers.get("user-agent") if request else None),
+    )
+
     token = issue_dev_token(user_id=user_id, tenant_id="default")
     return {
         "status": "signed_up",
@@ -985,6 +1015,64 @@ async def auth_signin_local(
         "token": token,
         "redirect": "/dashboard/upload",
     }
+
+
+
+@app.post("/api/v1/auth/password/forgot")
+async def auth_password_forgot(email: str = Query(..., min_length=3)) -> dict:
+    email_norm = str(email or "").strip().lower()
+    user = get_user_by_email(email_norm)
+    # Always return generic response to avoid account enumeration.
+    if not user:
+        return {"ok": True, "status": "accepted"}
+
+    raw_token = secrets.token_urlsafe(24)
+    token_hash = _sha256_hex(raw_token)
+    expires_at = (datetime.utcnow() + timedelta(minutes=20)).isoformat()
+    create_password_reset_token(token_hash=token_hash, user_id=str(user.get("user_id")), expires_at=expires_at)
+
+    try:
+        _send_reset_via_best_channel(user=user, token=raw_token)
+    except Exception:
+        # do not leak channel/provider details
+        pass
+
+    resp = {"ok": True, "status": "accepted"}
+    if otp_provider.mode == "dev":
+        # local dev visibility only
+        resp["dev_reset_token"] = raw_token
+    return resp
+
+
+@app.post("/api/v1/auth/password/reset")
+async def auth_password_reset(
+    reset_token: str = Query(..., min_length=12),
+    new_password: str = Query(..., min_length=8),
+) -> dict:
+    token_hash = _sha256_hex(reset_token)
+    rec = get_password_reset_token(token_hash)
+    if not rec or str(rec.get("status")) != "pending":
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+
+    exp = str(rec.get("expires_at") or "")
+    if not exp:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+    try:
+        if datetime.utcnow() > datetime.fromisoformat(exp):
+            raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+
+    user_id = str(rec.get("user_id") or "")
+    if not user_id or not get_user_by_id(user_id):
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+
+    salt_hex, digest_hex = _hash_password(new_password)
+    upsert_local_credential(user_id, password_salt=salt_hex, password_hash=digest_hex)
+    mark_password_reset_token_used(token_hash)
+
+    return {"ok": True, "status": "password_updated"}
+
 
 
 
