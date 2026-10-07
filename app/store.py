@@ -989,6 +989,23 @@ def get_pending_signup_token(token_hash: str) -> Optional[dict[str, Any]]:
     return dict(row) if row else None
 
 
+def get_latest_pending_signup_by_email(email: str) -> Optional[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT token_hash, email, full_name, phone_e164, password_salt, password_hash,
+               terms_version, accepted_at, signup_ip, user_agent, expires_at, status, created_at, used_at
+        FROM pending_signup_tokens
+        WHERE email=? AND status='pending'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (email,),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def mark_pending_signup_token_used(token_hash: str) -> None:
     conn = _ensure_conn()
     now = _now_iso()

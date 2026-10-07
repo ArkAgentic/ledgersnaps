@@ -49,6 +49,7 @@ from .store import (
     get_oauth_identity,
     get_password_reset_token,
     get_pending_signup_token,
+    get_latest_pending_signup_by_email,
     get_user_by_email,
     get_user_by_id,
     get_user_by_phone,
@@ -968,17 +969,18 @@ async def auth_signup(
         expires_at=expires_at,
     )
 
+    verify_code = f"{int(token_hash[:12], 16) % 1000000:06d}"
     try:
         host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
         scheme = (request.url.scheme if request else "https") or "https"
         verify_link = f"{scheme}://{host}/api/v1/auth/signup/verify?token={raw_token}"
-        send_signup_verification_email(to_email=email_norm, verify_link=verify_link)
+        send_signup_verification_email(to_email=email_norm, verify_link=verify_link, verify_code=verify_code)
     except Exception:
         pass
 
     out = {"status": "verification_sent"}
     if os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower() == "dev":
-        out["dev_verify_token"] = raw_token
+        out["dev_verify_code"] = verify_code
     return out
 
 
@@ -997,6 +999,77 @@ async def auth_signup_verify(request: Request, token: str = Query(..., min_lengt
             raise HTTPException(status_code=400, detail="invalid_or_expired_signup_token")
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid_or_expired_signup_token")
+
+    email_norm = str(rec.get("email") or "").strip().lower()
+    phone_e164 = str(rec.get("phone_e164") or "").strip()
+    full_name = str(rec.get("full_name") or "").strip()
+
+    if get_user_by_email(email_norm) or get_user_by_phone(phone_e164):
+        mark_pending_signup_token_used(token_hash)
+        raise HTTPException(status_code=409, detail="account_already_exists")
+
+    user_id = f"u-{secrets.token_hex(8)}"
+    try:
+        record_trial_claim(
+            user_id,
+            phone_e164=phone_e164,
+            device_fingerprint="landing-signup-verified",
+            signup_ip=None,
+            email=email_norm,
+            full_name=full_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+    upsert_local_credential(
+        user_id,
+        password_salt=str(rec.get("password_salt") or ""),
+        password_hash=str(rec.get("password_hash") or ""),
+    )
+
+    append_signup_audit(
+        user_id=user_id,
+        email=email_norm,
+        phone_e164=phone_e164,
+        accepted_terms=True,
+        terms_version=str(rec.get("terms_version") or "v1"),
+        accepted_at=str(rec.get("accepted_at") or datetime.utcnow().isoformat()),
+        signup_ip=str(rec.get("signup_ip") or "") or None,
+        user_agent=str(rec.get("user_agent") or "") or None,
+    )
+    mark_pending_signup_token_used(token_hash)
+
+    token_out = issue_dev_token(user_id=user_id, tenant_id="default")
+    return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/dashboard/upload"}
+
+
+@app.post("/api/v1/auth/signup/verify-code")
+async def auth_signup_verify_code(
+    email: str = Query(..., min_length=3),
+    code: str = Query(..., min_length=6, max_length=6),
+) -> dict:
+    email_norm = str(email or "").strip().lower()
+    pending = get_latest_pending_signup_by_email(email_norm)
+    if not pending or str(pending.get("status")) != "pending":
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+
+    exp = str(pending.get("expires_at") or "")
+    if not exp:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+    try:
+        if datetime.utcnow() > datetime.fromisoformat(exp):
+            raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+
+    token_hash = str(pending.get("token_hash") or "")
+    expected = f"{int(token_hash[:12], 16) % 1000000:06d}" if token_hash else ""
+    if not expected or str(code).strip() != expected:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+
+    rec = get_pending_signup_token(token_hash)
+    if not rec or str(rec.get("status")) != "pending":
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
 
     email_norm = str(rec.get("email") or "").strip().lower()
     phone_e164 = str(rec.get("phone_e164") or "").strip()
