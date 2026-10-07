@@ -9,10 +9,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preload" href="/assets/images/landing-bg-dark-laser.png" as="image">
+  <link rel="preload" href="/assets/images/landing-bg-light.png" as="image">
   <style>
     :root { --brand-red:#E32652; }
     body { font-family:'Sora',sans-serif; }
     .left-bg {
+      background-color: #0b1526;
       /* extensible, no distortion */
       background-image: linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser.png');
       background-size: cover;
@@ -20,6 +23,7 @@
       background-repeat: no-repeat;
     }
     .right-bg {
+      background-color: #f6f7fb;
       background-image: url('/assets/images/landing-bg-light.png');
       background-size: cover;
       background-position: center;
@@ -357,6 +361,48 @@
       const createStatus = document.getElementById('create-status');
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
+
+      function stabilizeAuthContainerHeight() {
+        const host = signinCombined && signinCombined.parentElement;
+        if (!host || !signinCombined || !resetPanel || !createAccountPanel) return;
+
+        const prev = {
+          signin: signinCombined.classList.contains('hidden'),
+          reset: resetPanel.classList.contains('hidden'),
+          create: createAccountPanel.classList.contains('hidden'),
+        };
+
+        // measure all panes without moving layout
+        signinCombined.classList.remove('hidden');
+        resetPanel.classList.remove('hidden');
+        createAccountPanel.classList.remove('hidden');
+        [signinCombined, resetPanel, createAccountPanel].forEach((el) => {
+          el.style.position = 'absolute';
+          el.style.visibility = 'hidden';
+          el.style.pointerEvents = 'none';
+          el.style.left = '0';
+          el.style.right = '0';
+        });
+
+        const h = Math.max(signinCombined.offsetHeight || 0, resetPanel.offsetHeight || 0, createAccountPanel.offsetHeight || 0);
+
+        [signinCombined, resetPanel, createAccountPanel].forEach((el) => {
+          el.style.position = '';
+          el.style.visibility = '';
+          el.style.pointerEvents = '';
+          el.style.left = '';
+          el.style.right = '';
+        });
+
+        if (prev.signin) signinCombined.classList.add('hidden');
+        if (prev.reset) resetPanel.classList.add('hidden');
+        if (prev.create) createAccountPanel.classList.add('hidden');
+
+        if (h > 0) host.style.minHeight = `${h}px`;
+      }
+
+      stabilizeAuthContainerHeight();
+      window.addEventListener('resize', stabilizeAuthContainerHeight);
 
       function showResetMode() {
         if (signinCombined) signinCombined.classList.add('hidden');

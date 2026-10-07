@@ -1,5 +1,5 @@
 (function (global) {
-  const DURATION_MS = 460;
+  const DURATION_MS = 320;
   const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const activeByParent = new WeakMap();
 
@@ -7,20 +7,22 @@
     return !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
-  function nextFrame() {
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-  }
-
   function stopActive(parent) {
     const running = parent && activeByParent.get(parent);
     if (!running) return;
-    try { running.outAnim?.cancel(); } catch (_) {}
-    try { running.inAnim?.cancel(); } catch (_) {}
+    try { running.cancelled = true; running.outAnim?.cancel(); running.inAnim?.cancel(); } catch (_) {}
     activeByParent.delete(parent);
+  }
+
+  function waitFinished(anim) {
+    return anim?.finished?.catch(() => undefined) || Promise.resolve();
   }
 
   async function swap({ outEl, inEl, hideClass = 'hidden', onBeforeIn } = {}) {
     if (!outEl || !inEl || outEl === inEl) return;
+
+    const parent = outEl.parentElement || inEl.parentElement;
+    if (parent) stopActive(parent);
 
     if (reducedMotion()) {
       if (onBeforeIn) onBeforeIn();
@@ -29,69 +31,41 @@
       return;
     }
 
-    const parent = outEl.parentElement;
-    if (!parent) {
-      if (onBeforeIn) onBeforeIn();
-      outEl.classList.add(hideClass);
-      inEl.classList.remove(hideClass);
-      return;
-    }
+    const ctx = { cancelled: false, outAnim: null, inAnim: null };
+    if (parent) activeByParent.set(parent, ctx);
 
-    stopActive(parent);
-
-    outEl.classList.remove(hideClass);
-    inEl.classList.remove(hideClass);
-
-    // Overlay both panes in the same grid cell during transition
-    const prevParentDisplay = parent.style.display;
-    const prevParentAlignItems = parent.style.alignItems;
-    const prevParentMinHeight = parent.style.minHeight;
-    const prevOutGridArea = outEl.style.gridArea;
-    const prevInGridArea = inEl.style.gridArea;
-
-    parent.style.display = 'grid';
-    parent.style.alignItems = 'start';
-    outEl.style.gridArea = '1 / 1';
-    inEl.style.gridArea = '1 / 1';
-
-    const h = Math.max(outEl.offsetHeight || 0, inEl.offsetHeight || 0);
-    if (h > 0) parent.style.minHeight = `${h}px`;
+    // Fade out current pane only (no translate/scale/blur)
+    outEl.style.willChange = 'opacity';
+    ctx.outAnim = outEl.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: DURATION_MS,
+      easing: EASE,
+      fill: 'forwards',
+    });
+    await waitFinished(ctx.outAnim);
+    if (ctx.cancelled) return;
 
     if (onBeforeIn) onBeforeIn();
 
-    outEl.style.willChange = 'opacity';
-    inEl.style.willChange = 'opacity';
-    inEl.style.opacity = '0';
-
-    await nextFrame();
-
-    const outAnim = outEl.animate(
-      [{ opacity: 1 }, { opacity: 0 }],
-      { duration: DURATION_MS, easing: EASE, fill: 'forwards' }
-    );
-    const inAnim = inEl.animate(
-      [{ opacity: 0 }, { opacity: 1 }],
-      { duration: DURATION_MS, easing: EASE, fill: 'forwards' }
-    );
-
-    activeByParent.set(parent, { outAnim, inAnim });
-
-    await Promise.allSettled([outAnim.finished, inAnim.finished]);
-
     outEl.classList.add(hideClass);
+    inEl.classList.remove(hideClass);
+
+    // Fade in target pane
+    inEl.style.opacity = '0';
+    inEl.style.willChange = 'opacity';
+    ctx.inAnim = inEl.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: DURATION_MS,
+      easing: EASE,
+      fill: 'forwards',
+    });
+    await waitFinished(ctx.inAnim);
+    if (ctx.cancelled) return;
 
     outEl.style.opacity = '';
     inEl.style.opacity = '';
     outEl.style.willChange = '';
     inEl.style.willChange = '';
 
-    outEl.style.gridArea = prevOutGridArea;
-    inEl.style.gridArea = prevInGridArea;
-    parent.style.display = prevParentDisplay;
-    parent.style.alignItems = prevParentAlignItems;
-    parent.style.minHeight = prevParentMinHeight;
-
-    activeByParent.delete(parent);
+    if (parent) activeByParent.delete(parent);
   }
 
   global.FadeThrough = { swap };
