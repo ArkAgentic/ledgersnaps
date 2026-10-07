@@ -1,8 +1,6 @@
 (function (global) {
-  const ENTER_DURATION_S = 0.72;
-  const EXIT_DURATION_S = 0.42;
-  const ENTER_EASE = 'cubic-bezier(0.2, 0, 0, 1)';
-  const EXIT_EASE = 'cubic-bezier(0.4, 0, 1, 1)';
+  const FADE_DURATION_S = 0.55;
+  const FADE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
   function reducedMotion() {
     return !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -17,49 +15,50 @@
     if (!outEl || !inEl) return;
 
     if (reducedMotion()) {
+      if (onBeforeIn) onBeforeIn();
       outEl.classList.add(hideClass);
       inEl.classList.remove(hideClass);
-      if (onBeforeIn) onBeforeIn();
       return;
     }
+
+    const parent = outEl.parentElement;
+    const prevMinHeight = parent ? parent.style.minHeight : '';
 
     outEl.classList.remove(hideClass);
     inEl.classList.remove(hideClass);
 
-    // Prepare in element initial state
-    apply(inEl, {
-      opacity: '0',
-      transform: 'scale(0.995)',
-      filter: 'blur(2px)',
-      transition: 'none',
-    });
+    // Lock height during cross-fade to prevent vertical jump
+    if (parent) {
+      const h = Math.max(outEl.offsetHeight || 0, inEl.offsetHeight || 0);
+      if (h > 0) parent.style.minHeight = `${h}px`;
+    }
 
-    // Animate out element
-    apply(outEl, {
-      transition: `opacity ${EXIT_DURATION_S}s ${EXIT_EASE}, transform ${EXIT_DURATION_S}s ${EXIT_EASE}, filter ${EXIT_DURATION_S}s ${EXIT_EASE}`,
-      opacity: '0',
-      transform: 'scale(1)',
-      filter: 'blur(0px)',
-    });
-
-    await new Promise((r) => setTimeout(r, EXIT_DURATION_S * 1000));
-
-    outEl.classList.add(hideClass);
     if (onBeforeIn) onBeforeIn();
 
-    // Animate in
+    // Pure fade only: no translate/scale/blur movement
     apply(inEl, {
-      transition: `opacity ${ENTER_DURATION_S}s ${ENTER_EASE}, transform ${ENTER_DURATION_S}s ${ENTER_EASE}, filter ${ENTER_DURATION_S}s ${ENTER_EASE}`,
+      opacity: '0',
+      transition: `opacity ${FADE_DURATION_S}s ${FADE_EASE}`,
+    });
+    apply(outEl, {
       opacity: '1',
-      transform: 'scale(1)',
-      filter: 'blur(0px)',
+      transition: `opacity ${FADE_DURATION_S}s ${FADE_EASE}`,
     });
 
-    await new Promise((r) => setTimeout(r, ENTER_DURATION_S * 1000));
+    // force style flush
+    void inEl.offsetHeight;
 
-    // cleanup inline style so layout remains controllable by classes
-    apply(inEl, { transition: '', opacity: '', transform: '', filter: '' });
-    apply(outEl, { transition: '', opacity: '', transform: '', filter: '' });
+    apply(inEl, { opacity: '1' });
+    apply(outEl, { opacity: '0' });
+
+    await new Promise((r) => setTimeout(r, FADE_DURATION_S * 1000));
+
+    outEl.classList.add(hideClass);
+
+    apply(inEl, { transition: '', opacity: '' });
+    apply(outEl, { transition: '', opacity: '' });
+
+    if (parent) parent.style.minHeight = prevMinHeight || '';
   }
 
   global.FadeThrough = { swap };
