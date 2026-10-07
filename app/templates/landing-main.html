@@ -473,6 +473,15 @@
             return;
           }
 
+          // Persist normalized payload shape (no spacing in phone number)
+          const signupPayload = {
+            full_name: name.trim(),
+            email: email.trim(),
+            phone_e164: `+61${phoneLocal}`,
+            password: pwd,
+          };
+          window.__ledgersnapsSignupDraft = signupPayload;
+
           createStatus.textContent = document.documentElement.lang === 'zh-CN'
             ? '注册入口即将启用，请先使用 Xero 登录。'
             : 'Signup flow will be enabled next. Please use Xero sign-in for now.';
