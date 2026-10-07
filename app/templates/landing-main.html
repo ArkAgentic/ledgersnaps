@@ -176,13 +176,24 @@
             <input id="create-email-input" type="email" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
           </div>
           <div>
-            <label class="text-sm text-neutral-700 block" data-i18n="phone_au">Phone (+61XXXXXXXXX)</label>
-            <input id="create-phone-input" type="tel" placeholder="+61412345678" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+            <label class="text-sm text-neutral-700 block" data-i18n="phone_local">Phone number</label>
+            <div class="mt-1 flex items-center gap-2">
+              <span class="h-11 min-w-[68px] rounded-xl border border-neutral-300 px-3 inline-flex items-center justify-center text-sm text-neutral-700 bg-neutral-50">+61</span>
+              <input id="create-phone-input" type="tel" inputmode="numeric" placeholder="412345678" class="flex-1 h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+            </div>
           </div>
           <div>
             <label class="text-sm text-neutral-700 block" data-i18n="password">Password</label>
             <input id="create-password-input" type="password" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
           </div>
+          <div>
+            <label class="text-sm text-neutral-700 block" data-i18n="reenter_password">Re-enter Password</label>
+            <input id="create-password-confirm-input" type="password" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          </div>
+          <label class="flex items-start gap-2 text-sm text-neutral-600">
+            <input id="accept-terms-checkbox" type="checkbox" class="mt-1 h-4 w-4 rounded border-neutral-300 text-[#E32652] focus:ring-[#E32652]" />
+            <span><span data-i18n="accept_prefix">I accept LedgerSnaps' </span><a href="/terms" class="underline hover:text-neutral-800" data-i18n="terms">Terms & Conditions</a><span data-i18n="accept_middle"> & </span><a href="/privacy" class="underline hover:text-neutral-800" data-i18n="privacy">Privacy Policy</a></span>
+          </label>
           <button id="btn-create-account" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="create_account">Create account</button>
           <a href="#" id="back-from-create" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</a>
           <p id="create-status" class="text-sm text-neutral-600"></p>
@@ -222,7 +233,10 @@
           create_hint: 'Create your account to start your free trial.',
           full_name: 'Full Name',
           create_account: 'Create account',
-          phone_au: 'Phone (+61XXXXXXXXX)',
+          phone_local: 'Phone number',
+          reenter_password: 'Re-enter Password',
+          accept_prefix: "I accept LedgerSnaps' ",
+          accept_middle: ' & ',
           no_account: 'Don’t have an account yet?',
           start_trial: 'Start your 7-day free trial',
           lang_label: 'English (AU)',
@@ -254,7 +268,10 @@
           create_hint: '创建账户以开始你的免费试用。',
           full_name: '姓名',
           create_account: '创建账户',
-          phone_au: '手机号（+61XXXXXXXXX）',
+          phone_local: '手机号',
+          reenter_password: '再次输入密码',
+          accept_prefix: '我接受 LedgerSnaps 的',
+          accept_middle: '和',
           no_account: '还没有账号吗？',
           start_trial: '开始 7 天免费试用',
           lang_label: '中文 (CN)',
@@ -414,18 +431,33 @@
         e.preventDefault();
         const name = (document.getElementById('create-name-input') || {}).value || '';
         const email = (document.getElementById('create-email-input') || {}).value || '';
-        const phone = (document.getElementById('create-phone-input') || {}).value || '';
-        const phonePattern = /^\+61\d{9}$/;
+        const phoneLocal = (document.getElementById('create-phone-input') || {}).value || '';
+        const pwd = (document.getElementById('create-password-input') || {}).value || '';
+        const pwd2 = (document.getElementById('create-password-confirm-input') || {}).value || '';
+        const accepted = !!((document.getElementById('accept-terms-checkbox') || {}).checked);
+        const phonePattern = /^\d{9}$/;
 
         if (createStatus) {
           if (!name.trim() || !email.trim()) {
             createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请填写姓名和邮箱。' : 'Please enter your name and email.';
             return;
           }
-          if (!phonePattern.test(phone.trim())) {
+          if (!phonePattern.test(phoneLocal.trim())) {
             createStatus.textContent = document.documentElement.lang === 'zh-CN'
-              ? '手机号格式必须为 +61 后跟 9 位数字。'
-              : 'Phone must be in +61 followed by 9 digits format.';
+              ? '手机号格式必须为 +61 后跟 9 位数字（仅填后 9 位）。'
+              : 'Phone must be +61 followed by 9 digits (enter 9 digits only).';
+            return;
+          }
+          if (!pwd || !pwd2) {
+            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请完整输入两次密码。' : 'Please enter password twice.';
+            return;
+          }
+          if (pwd !== pwd2) {
+            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '两次输入的密码不一致。' : 'Passwords do not match.';
+            return;
+          }
+          if (!accepted) {
+            createStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.';
             return;
           }
 
