@@ -1,18 +1,26 @@
 (function (global) {
-  const FADE_DURATION_S = 0.55;
-  const FADE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const DURATION_MS = 460;
+  const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const activeByParent = new WeakMap();
 
   function reducedMotion() {
     return !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
-  function apply(el, cfg) {
-    if (!el) return;
-    Object.assign(el.style, cfg);
+  function nextFrame() {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  function stopActive(parent) {
+    const running = parent && activeByParent.get(parent);
+    if (!running) return;
+    try { running.outAnim?.cancel(); } catch (_) {}
+    try { running.inAnim?.cancel(); } catch (_) {}
+    activeByParent.delete(parent);
   }
 
   async function swap({ outEl, inEl, hideClass = 'hidden', onBeforeIn } = {}) {
-    if (!outEl || !inEl) return;
+    if (!outEl || !inEl || outEl === inEl) return;
 
     if (reducedMotion()) {
       if (onBeforeIn) onBeforeIn();
@@ -22,43 +30,68 @@
     }
 
     const parent = outEl.parentElement;
-    const prevMinHeight = parent ? parent.style.minHeight : '';
+    if (!parent) {
+      if (onBeforeIn) onBeforeIn();
+      outEl.classList.add(hideClass);
+      inEl.classList.remove(hideClass);
+      return;
+    }
+
+    stopActive(parent);
 
     outEl.classList.remove(hideClass);
     inEl.classList.remove(hideClass);
 
-    // Lock height during cross-fade to prevent vertical jump
-    if (parent) {
-      const h = Math.max(outEl.offsetHeight || 0, inEl.offsetHeight || 0);
-      if (h > 0) parent.style.minHeight = `${h}px`;
-    }
+    // Overlay both panes in the same grid cell during transition
+    const prevParentDisplay = parent.style.display;
+    const prevParentAlignItems = parent.style.alignItems;
+    const prevParentMinHeight = parent.style.minHeight;
+    const prevOutGridArea = outEl.style.gridArea;
+    const prevInGridArea = inEl.style.gridArea;
+
+    parent.style.display = 'grid';
+    parent.style.alignItems = 'start';
+    outEl.style.gridArea = '1 / 1';
+    inEl.style.gridArea = '1 / 1';
+
+    const h = Math.max(outEl.offsetHeight || 0, inEl.offsetHeight || 0);
+    if (h > 0) parent.style.minHeight = `${h}px`;
 
     if (onBeforeIn) onBeforeIn();
 
-    // Pure fade only: no translate/scale/blur movement
-    apply(inEl, {
-      opacity: '0',
-      transition: `opacity ${FADE_DURATION_S}s ${FADE_EASE}`,
-    });
-    apply(outEl, {
-      opacity: '1',
-      transition: `opacity ${FADE_DURATION_S}s ${FADE_EASE}`,
-    });
+    outEl.style.willChange = 'opacity';
+    inEl.style.willChange = 'opacity';
+    inEl.style.opacity = '0';
 
-    // force style flush
-    void inEl.offsetHeight;
+    await nextFrame();
 
-    apply(inEl, { opacity: '1' });
-    apply(outEl, { opacity: '0' });
+    const outAnim = outEl.animate(
+      [{ opacity: 1 }, { opacity: 0 }],
+      { duration: DURATION_MS, easing: EASE, fill: 'forwards' }
+    );
+    const inAnim = inEl.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: DURATION_MS, easing: EASE, fill: 'forwards' }
+    );
 
-    await new Promise((r) => setTimeout(r, FADE_DURATION_S * 1000));
+    activeByParent.set(parent, { outAnim, inAnim });
+
+    await Promise.allSettled([outAnim.finished, inAnim.finished]);
 
     outEl.classList.add(hideClass);
 
-    apply(inEl, { transition: '', opacity: '' });
-    apply(outEl, { transition: '', opacity: '' });
+    outEl.style.opacity = '';
+    inEl.style.opacity = '';
+    outEl.style.willChange = '';
+    inEl.style.willChange = '';
 
-    if (parent) parent.style.minHeight = prevMinHeight || '';
+    outEl.style.gridArea = prevOutGridArea;
+    inEl.style.gridArea = prevInGridArea;
+    parent.style.display = prevParentDisplay;
+    parent.style.alignItems = prevParentAlignItems;
+    parent.style.minHeight = prevParentMinHeight;
+
+    activeByParent.delete(parent);
   }
 
   global.FadeThrough = { swap };
