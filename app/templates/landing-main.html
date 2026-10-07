@@ -161,7 +161,7 @@
           </div>
         </div>
 
-        <div id="reset-panel" class="hidden mt-5 w-[80%] mx-auto">
+        <div id="reset-panel" class="hidden w-[80%] mx-auto">
           <p class="text-sm text-neutral-600 mb-3" data-i18n="reset_hint">Enter your email to receive a password reset link.</p>
           <input id="reset-email-input" type="email" class="w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
           <button id="btn-send-reset" class="mt-4 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="send_reset">Send reset link</button>
@@ -169,7 +169,7 @@
           <p id="reset-status" class="mt-3 text-sm text-neutral-600"></p>
         </div>
 
-        <div id="create-account-panel" class="hidden mt-5 w-[80%] mx-auto space-y-3">
+        <div id="create-account-panel" class="hidden w-[80%] mx-auto space-y-3">
           <div>
             <label class="text-sm text-neutral-700 block" data-i18n="full_name">Full Name</label>
             <input id="create-name-input" type="text" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
@@ -361,48 +361,6 @@
       const createStatus = document.getElementById('create-status');
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
-
-      function stabilizeAuthContainerHeight() {
-        const host = signinCombined && signinCombined.parentElement;
-        if (!host || !signinCombined || !resetPanel || !createAccountPanel) return;
-
-        const prev = {
-          signin: signinCombined.classList.contains('hidden'),
-          reset: resetPanel.classList.contains('hidden'),
-          create: createAccountPanel.classList.contains('hidden'),
-        };
-
-        // measure all panes without moving layout
-        signinCombined.classList.remove('hidden');
-        resetPanel.classList.remove('hidden');
-        createAccountPanel.classList.remove('hidden');
-        [signinCombined, resetPanel, createAccountPanel].forEach((el) => {
-          el.style.position = 'absolute';
-          el.style.visibility = 'hidden';
-          el.style.pointerEvents = 'none';
-          el.style.left = '0';
-          el.style.right = '0';
-        });
-
-        const h = Math.max(signinCombined.offsetHeight || 0, resetPanel.offsetHeight || 0, createAccountPanel.offsetHeight || 0);
-
-        [signinCombined, resetPanel, createAccountPanel].forEach((el) => {
-          el.style.position = '';
-          el.style.visibility = '';
-          el.style.pointerEvents = '';
-          el.style.left = '';
-          el.style.right = '';
-        });
-
-        if (prev.signin) signinCombined.classList.add('hidden');
-        if (prev.reset) resetPanel.classList.add('hidden');
-        if (prev.create) createAccountPanel.classList.add('hidden');
-
-        if (h > 0) host.style.minHeight = `${h}px`;
-      }
-
-      stabilizeAuthContainerHeight();
-      window.addEventListener('resize', stabilizeAuthContainerHeight);
 
       function showResetMode() {
         if (signinCombined) signinCombined.classList.add('hidden');

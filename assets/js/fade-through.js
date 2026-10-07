@@ -34,6 +34,16 @@
     const ctx = { cancelled: false, outAnim: null, inAnim: null };
     if (parent) activeByParent.set(parent, ctx);
 
+    // Freeze container height during transition to avoid any reflow jump.
+    const prevMinHeight = parent ? parent.style.minHeight : '';
+    if (parent) {
+      outEl.classList.remove(hideClass);
+      inEl.classList.remove(hideClass);
+      const lockH = Math.max(outEl.offsetHeight || 0, inEl.offsetHeight || 0);
+      if (lockH > 0) parent.style.minHeight = `${lockH}px`;
+      if (inEl.classList.contains(hideClass)) inEl.classList.add(hideClass);
+    }
+
     // Fade out current pane only (no translate/scale/blur)
     outEl.style.willChange = 'opacity';
     ctx.outAnim = outEl.animate([{ opacity: 1 }, { opacity: 0 }], {
@@ -65,6 +75,7 @@
     outEl.style.willChange = '';
     inEl.style.willChange = '';
 
+    if (parent) parent.style.minHeight = prevMinHeight || '';
     if (parent) activeByParent.delete(parent);
   }
 
