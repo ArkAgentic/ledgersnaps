@@ -342,8 +342,10 @@
         });
         const lbl = document.getElementById('lang-current-label');
         if (lbl) lbl.textContent = dict.lang_label;
-        if (leftLegalPanel && !leftLegalPanel.classList.contains('hidden')) {
-          const activeKind = leftLegalTitle && String(leftLegalTitle.textContent || '').toLowerCase().includes('privacy') ? 'privacy' : 'terms';
+        const legalPanelEl = document.getElementById('left-legal-panel');
+        const legalTitleEl = document.getElementById('left-legal-title');
+        if (legalPanelEl && !legalPanelEl.classList.contains('hidden')) {
+          const activeKind = legalTitleEl && String(legalTitleEl.textContent || '').toLowerCase().includes('privacy') ? 'privacy' : 'terms';
           showLeftLegal(activeKind);
         }
         const cr = document.getElementById('footer-copyright');
