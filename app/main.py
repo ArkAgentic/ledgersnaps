@@ -418,6 +418,7 @@ async def landing_page() -> HTMLResponse:
 
 
 @app.get("/terms", response_class=HTMLResponse)
+@app.get("/term", response_class=HTMLResponse)
 async def landing_terms_page() -> HTMLResponse:
     return _render_template_or_500("landing-main.html", "landing_template_missing")
 

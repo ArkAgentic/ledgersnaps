@@ -349,10 +349,8 @@
         if (lbl) lbl.textContent = dict.lang_label;
         localStorage.setItem('ledgersnaps_lang', normalized);
         const legalPanelEl = document.getElementById('left-legal-panel');
-        const legalTitleEl = document.getElementById('left-legal-title');
         if (legalPanelEl && !legalPanelEl.classList.contains('hidden')) {
-          const titleText = String((legalTitleEl && legalTitleEl.textContent) || '').toLowerCase();
-          const activeKind = (titleText.includes('privacy') || titleText.includes('隐私')) ? 'privacy' : 'terms';
+          const activeKind = currentLegalKind || ((window.location.pathname || '') === '/privacy' ? 'privacy' : 'terms');
           showLeftLegal(activeKind, false);
         }
         const cr = document.getElementById('footer-copyright');
@@ -454,6 +452,7 @@
       const resendCodeBtn = document.getElementById('btn-resend-code');
       let resendCooldownTimer = null;
       let resendCooldownRemaining = 0;
+      let currentLegalKind = null;
 
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
@@ -545,6 +544,7 @@
       function showLeftMain(updateHistory = true) {
         if (leftMainContent) leftMainContent.classList.remove('hidden');
         if (leftLegalPanel) leftLegalPanel.classList.add('hidden');
+        currentLegalKind = null;
         if (updateHistory) {
           history.replaceState({}, '', '/');
         }
@@ -552,6 +552,8 @@
 
       function showLeftLegal(kind, updateHistory = true) {
         if (!leftMainContent || !leftLegalPanel || !leftLegalTitle || !leftLegalContent) return;
+        const legalKind = kind === 'privacy' ? 'privacy' : 'terms';
+        currentLegalKind = legalKind;
         const lang = normalizeLang(localStorage.getItem('ledgersnaps_lang') || document.documentElement.lang || 'en');
         const isZh = lang === 'zh';
         const TERMS_HTML = {
@@ -565,17 +567,17 @@
 
         const dict = I18N[isZh ? 'zh' : 'en'] || I18N.en;
         if (leftLegalBack) leftLegalBack.textContent = dict.back_to_home || 'Back to home';
-        if (kind === 'privacy') {
+        if (legalKind === 'privacy') {
           leftLegalTitle.textContent = dict.privacy || (isZh ? '隐私政策' : 'Privacy Policy');
           leftLegalContent.innerHTML = isZh ? PRIVACY_HTML.zh : PRIVACY_HTML.en;
         } else {
-          leftLegalTitle.textContent = dict.terms || (isZh ? '条款与条件' : 'Terms & Conditions');
+          leftLegalTitle.textContent = dict.terms || (isZh ? '服务条款' : 'Terms & Conditions');
           leftLegalContent.innerHTML = isZh ? TERMS_HTML.zh : TERMS_HTML.en;
         }
         leftMainContent.classList.add('hidden');
         leftLegalPanel.classList.remove('hidden');
         if (updateHistory) {
-          history.replaceState({}, '', kind === 'privacy' ? '/privacy' : '/terms');
+          history.replaceState({}, '', legalKind === 'privacy' ? '/privacy' : '/terms');
         }
       }
 
@@ -618,7 +620,7 @@
       });
 
       const pathName = window.location.pathname || '/';
-      if (pathName === '/terms') {
+      if (pathName === '/terms' || pathName === '/term') {
         showLeftLegal('terms', false);
       } else if (pathName === '/privacy') {
         showLeftLegal('privacy', false);
