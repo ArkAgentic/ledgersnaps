@@ -133,9 +133,8 @@ def _signup_headers(to_email: str) -> dict[str, str]:
     }
 
 
-def send_signup_verification_email(*, to_email: str, verify_link: str, verify_code: str) -> None:
-    _ = verify_link
-    html_body = f"""<!doctype html>
+def render_signup_verification_email_html(*, verify_code: str) -> str:
+    return f"""<!doctype html>
 <html>
   <body style=\"margin:0;padding:0;background:#f5f1eb;font-family:'Sora','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;\">
     <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f5f1eb;background-image:url('https://www.ledgersnaps.com/assets/images/landing-bg-light.png');background-size:cover;background-position:center;\">
@@ -148,12 +147,12 @@ def send_signup_verification_email(*, to_email: str, verify_link: str, verify_co
           <![endif]-->
           <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;margin:0 auto;border-collapse:collapse;\">
             <tr>
-              <td style=\"padding:0 0 18px 0;\">
-                <img src=\"https://www.ledgersnaps.com/assets/images/logo-transparent.png\" alt=\"LedgerSnaps\" width=\"320\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
+              <td style=\"padding:0 0 12px 0;\">
+                <img src=\"https://www.ledgersnaps.com/assets/images/logo-lockup-ledgersnaps-dark.svg\" alt=\"LedgerSnaps\" width=\"220\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
               </td>
             </tr>
             <tr>
-              <td style=\"padding:28px 34px;border-radius:20px;background:rgba(255,255,255,0.90);border:1px solid rgba(12,21,40,0.08);\">
+              <td style=\"padding:6px 0 0 0;\">
                 <p style=\"margin:0 0 12px;font-size:15px;line-height:1.65;color:#0f172a;\">Hi there,</p>
                 <p style=\"margin:0 0 12px;font-size:15px;line-height:1.65;color:#0f172a;\">Thanks for joining LedgerSnaps.</p>
                 <p style=\"margin:0 0 22px;font-size:15px;line-height:1.65;color:#0f172a;\">Please use this 6-digit code to complete your sign up:</p>
@@ -173,6 +172,11 @@ def send_signup_verification_email(*, to_email: str, verify_link: str, verify_co
     </table>
   </body>
 </html>"""
+
+
+def send_signup_verification_email(*, to_email: str, verify_link: str, verify_code: str) -> None:
+    _ = verify_link
+    html_body = render_signup_verification_email_html(verify_code=verify_code)
 
     plain_text = (
         "Hi there,\n\n"
