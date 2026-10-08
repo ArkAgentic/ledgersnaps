@@ -433,7 +433,6 @@
       const signupCta = document.getElementById('signup-cta');
       const resetStatus = document.getElementById('reset-status');
       const createStatus = document.getElementById('create-status');
-      const phoneOtpPanel = document.getElementById('phone-otp-panel');
       const sendPhoneOtpBtn = document.getElementById('btn-send-phone-otp');
       const phoneOtpInput = document.getElementById('phone-otp-input');
       const phoneOtpStatus = document.getElementById('phone-otp-status');
@@ -583,12 +582,6 @@
           setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.', 'error');
           return;
         }
-        if (!phoneOtpInput || !/^\d{6}$/.test(String(phoneOtpInput.value || '').trim())) {
-          markError(phoneOtpInput);
-          setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请先输入手机验证码。' : 'Please enter your phone verification code.', 'error');
-          return;
-        }
-
         try {
           const q = new URLSearchParams({
             full_name: name.trim(),
