@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import smtplib
+import secrets
 from email.message import EmailMessage
 
 from azure.communication.email import EmailClient
@@ -40,7 +41,7 @@ def _send_via_smtp(*, to_email: str, subject: str, body_text: str, body_html: st
         s.send_message(msg)
 
 
-def _send_via_azure(*, to_email: str, subject: str, body_text: str, body_html: str | None = None) -> None:
+def _send_via_azure(*, to_email: str, subject: str, body_text: str, body_html: str | None = None, headers: dict[str, str] | None = None) -> None:
     conn = os.getenv("AZURE_EMAIL_CONNECTION_STRING", "").strip()
     sender = os.getenv("AZURE_EMAIL_SENDER_ADDRESS", "").strip()
     if not conn or not sender:
@@ -50,17 +51,26 @@ def _send_via_azure(*, to_email: str, subject: str, body_text: str, body_html: s
     content = {"subject": subject, "plainText": body_text}
     if body_html:
         content["html"] = body_html
-    poller = client.begin_send(
-        {
-            "senderAddress": sender,
-            "recipients": {"to": [{"address": to_email}]},
-            "content": content,
-        }
-    )
+    payload: dict[str, object] = {
+        "senderAddress": sender,
+        "recipients": {"to": [{"address": to_email}]},
+        "content": content,
+    }
+    if headers:
+        payload["headers"] = headers
+
+    poller = client.begin_send(payload)
     poller.result()
 
 
-def _send_email(*, to_email: str, subject: str, body_text: str, body_html: str | None = None) -> None:
+def _send_email(
+    *,
+    to_email: str,
+    subject: str,
+    body_text: str,
+    body_html: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> None:
     provider = _provider()
     if provider == "dev":
         return
@@ -68,7 +78,13 @@ def _send_email(*, to_email: str, subject: str, body_text: str, body_html: str |
         _send_via_smtp(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html)
         return
     if provider == "azure":
-        _send_via_azure(to_email=to_email, subject=subject, body_text=body_text, body_html=body_html)
+        _send_via_azure(
+            to_email=to_email,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            headers=headers,
+        )
         return
     raise RuntimeError(f"unsupported_reset_email_provider:{provider}")
 
@@ -83,6 +99,35 @@ def send_password_reset_email(*, to_email: str, reset_link: str) -> None:
             "If you did not request this, you can ignore this email."
         ),
     )
+
+
+def _sender_domain() -> str:
+    sender = os.getenv("AZURE_EMAIL_SENDER_ADDRESS", "").strip()
+    if "@" in sender:
+        return sender.split("@", 1)[1].strip().lower()
+    return "ledgersnaps.com"
+
+
+def _recipient_token(to_email: str) -> str:
+    _ = to_email
+    return secrets.token_urlsafe(18)
+
+
+def _unsubscribe_link(to_email: str) -> str:
+    base = os.getenv("EMAIL_PREFERENCE_BASE_URL", "https://www.ledgersnaps.com").strip().rstrip("/")
+    token = _recipient_token(to_email)
+    return f"{base}/email/preferences?token={token}"
+
+
+def _signup_headers(to_email: str) -> dict[str, str]:
+    unsubscribe_url = _unsubscribe_link(to_email)
+    sender_domain = _sender_domain()
+    return {
+        "Reply-To": f"support@{sender_domain}",
+        "List-Unsubscribe": f"<{unsubscribe_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "X-Entity-Ref-ID": secrets.token_hex(16),
+    }
 
 
 def send_signup_verification_email(*, to_email: str, verify_link: str, verify_code: str) -> None:
@@ -133,4 +178,5 @@ def send_signup_verification_email(*, to_email: str, verify_link: str, verify_co
         subject="Your LedgerSnaps verification code",
         body_text=plain_text,
         body_html=html_body,
+        headers=_signup_headers(to_email),
     )
