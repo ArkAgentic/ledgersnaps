@@ -601,6 +601,13 @@
           showLeftLegal(kind);
         });
       });
+      document.querySelectorAll('a[href="/terms"], a[href="/privacy"]').forEach((a) => {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const href = a.getAttribute('href') || '';
+          showLeftLegal(href.includes('privacy') ? 'privacy' : 'terms');
+        });
+      });
       const createPhoneInput = document.getElementById('create-phone-input');
       if (createPhoneInput) {
         createPhoneInput.addEventListener('input', () => {
