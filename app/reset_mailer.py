@@ -148,7 +148,14 @@ def render_signup_verification_email_html(*, verify_code: str) -> str:
           <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;margin:0 auto;border-collapse:collapse;\">
             <tr>
               <td style=\"padding:0 0 12px 0;\">
-                <img src=\"https://www.ledgersnaps.com/assets/images/logo-transparent.png\" alt=\"LedgerSnaps\" width=\"180\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
+                <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#0b1526;border-radius:12px;\">
+                  <tr>
+                    <td style=\"padding:10px 10px 10px 12px;\">
+                      <img src=\"https://www.ledgersnaps.com/assets/images/logo-transparent.png\" alt=\"LedgerSnaps mark\" width=\"44\" height=\"44\" style=\"display:block;border:0;outline:none;text-decoration:none;width:44px;height:44px;\" />
+                    </td>
+                    <td style=\"padding:10px 14px 10px 0;font-family:'Sora','Inter',Arial,sans-serif;font-size:28px;line-height:1;color:#ffffff;letter-spacing:0.08em;font-weight:500;\">LEDGERSNAPS</td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
