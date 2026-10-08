@@ -275,6 +275,8 @@
           confirm_email_code: 'Confirm email code',
           complete_registration: 'Complete registration',
           resend_code: 'Resend code',
+          resend_in_prefix: 'Resend code in ',
+          resend_in_suffix: 's',
           phone_code_hint: 'Now verify your phone to complete registration.',
           send_phone_code: 'Send phone code',
           full_name: 'Full Name',
@@ -316,6 +318,8 @@
           confirm_email_code: '确认邮箱验证码',
           complete_registration: '完成注册',
           resend_code: '重新发送验证码',
+          resend_in_prefix: '重新发送（',
+          resend_in_suffix: '秒）',
           phone_code_hint: '现在请验证你的手机号以完成注册。',
           send_phone_code: '发送手机验证码',
           full_name: '姓名',
@@ -340,6 +344,10 @@
         });
         const lbl = document.getElementById('lang-current-label');
         if (lbl) lbl.textContent = dict.lang_label;
+        const resendBtnEl = document.getElementById('btn-resend-code');
+        if (resendBtnEl && typeof resendCooldownRemaining !== 'undefined' && resendCooldownRemaining > 0) {
+          resendBtnEl.textContent = cooldownLabel(resendCooldownRemaining);
+        }
         const cr = document.getElementById('footer-copyright');
         if (cr && dict.copyright) {
           const parts = String(dict.copyright).split('||');
@@ -441,6 +449,9 @@
       const completeRegistrationBtn = document.getElementById('btn-complete-registration');
       const completePhoneVerifyBtn = document.getElementById('btn-complete-phone-verify');
       const resendCodeBtn = document.getElementById('btn-resend-code');
+      let resendCooldownTimer = null;
+      let resendCooldownRemaining = 0;
+
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
 
@@ -469,6 +480,62 @@
 
       function showPhoneVerifyMode() {
         switchPanel(phoneVerifyPanel);
+      }
+
+      function setButtonLoading(btn, loading, loadingText) {
+        if (!btn) return;
+        if (!btn.dataset.baseText) btn.dataset.baseText = btn.textContent || '';
+        if (loading) {
+          btn.disabled = true;
+          btn.classList.add('opacity-60', 'cursor-not-allowed');
+          btn.textContent = loadingText || btn.dataset.baseText;
+        } else {
+          btn.disabled = false;
+          btn.classList.remove('opacity-60', 'cursor-not-allowed');
+          btn.textContent = btn.dataset.baseText || btn.textContent || '';
+        }
+      }
+
+      function cooldownLabel(seconds) {
+        const dict = I18N[(document.documentElement.lang || '').startsWith('zh') ? 'zh' : 'en'] || I18N.en;
+        const pre = dict.resend_in_prefix || 'Resend code in ';
+        const suf = dict.resend_in_suffix || 's';
+        return `${pre}${seconds}${suf}`;
+      }
+
+      function startResendCooldown(seconds) {
+        if (!resendCodeBtn) return;
+        if (resendCooldownTimer) {
+          clearInterval(resendCooldownTimer);
+          resendCooldownTimer = null;
+        }
+        resendCooldownRemaining = Math.max(0, Number(seconds) || 0);
+
+        const render = () => {
+          if (!resendCodeBtn) return;
+          if (resendCooldownRemaining > 0) {
+            resendCodeBtn.disabled = true;
+            resendCodeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            resendCodeBtn.textContent = cooldownLabel(resendCooldownRemaining);
+          } else {
+            resendCodeBtn.disabled = false;
+            resendCodeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            const dict = I18N[(document.documentElement.lang || '').startsWith('zh') ? 'zh' : 'en'] || I18N.en;
+            resendCodeBtn.textContent = dict.resend_code || 'Resend code';
+          }
+        };
+
+        render();
+        if (resendCooldownRemaining > 0) {
+          resendCooldownTimer = setInterval(() => {
+            resendCooldownRemaining -= 1;
+            render();
+            if (resendCooldownRemaining <= 0 && resendCooldownTimer) {
+              clearInterval(resendCooldownTimer);
+              resendCooldownTimer = null;
+            }
+          }, 1000);
+        }
       }
 
       function showSigninMode() {
@@ -582,6 +649,8 @@
           setCreateStatus(document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.', 'error');
           return;
         }
+
+        setButtonLoading(createAccountBtn, true, document.documentElement.lang === 'zh-CN' ? '创建中…' : 'Creating...');
         try {
           const q = new URLSearchParams({
             full_name: name.trim(),
@@ -628,10 +697,6 @@
               markError(termsInput);
               return (document.documentElement.lang === 'zh-CN' ? '请先同意服务条款与隐私政策。' : 'Please accept Terms & Conditions and Privacy Policy.');
             }
-            if (m.includes('phone_verification_required')) {
-              markError(phoneOtpInput);
-              return (document.documentElement.lang === 'zh-CN' ? '手机验证码将在邮箱验证后进行。' : 'Phone verification happens after email verification.');
-            }
             if (m.includes('invalid_phone') || m.includes('9 digits')) {
               markError(phoneInput);
               return (document.documentElement.lang === 'zh-CN' ? '请输入正确手机号（+61 后 9 位数字）。' : 'Please enter a valid phone number (9 digits after +61).');
@@ -659,9 +724,12 @@
               ? '验证码已发送，请输入 6 位验证码继续。'
               : 'Verification code sent. Enter the 6-digit code to continue.';
           }
+          startResendCooldown(30);
           showVerifyMode();
-        } catch (e) {
-          setCreateStatus(String(e.message || e), 'error');
+        } catch (e2) {
+          setCreateStatus(String(e2.message || e2), 'error');
+        } finally {
+          setButtonLoading(createAccountBtn, false);
         }
       });
       verifyCodeInputs.forEach((inp, idx) => {
@@ -724,8 +792,10 @@
 
       if (resendCodeBtn) resendCodeBtn.addEventListener('click', async (e) => {
         e.preventDefault();
+        if (resendCooldownRemaining > 0 || resendCodeBtn.disabled) return;
         const email = (localStorage.getItem('signup_verify_email') || '').trim().toLowerCase();
         if (!email) return;
+        setButtonLoading(resendCodeBtn, true, document.documentElement.lang === 'zh-CN' ? '发送中…' : 'Sending...');
         try {
           const q = new URLSearchParams({ email });
           const r = await fetch('/api/v1/auth/signup/resend-code?' + q.toString(), { method: 'POST' });
@@ -736,15 +806,21 @@
             verifyStatus.classList.add('status-success');
             verifyStatus.textContent = document.documentElement.lang === 'zh-CN' ? '验证码已重新发送。' : 'Verification code resent.';
           }
+          startResendCooldown(30);
         } catch (err) {
           if (verifyStatus) {
             verifyStatus.classList.remove('status-success');
             verifyStatus.classList.add('status-error');
             const m = String((err && err.message) || err || '');
             verifyStatus.textContent = m.includes('resend_cooldown')
-              ? (document.documentElement.lang === 'zh-CN' ? '请稍后再试（60 秒后可重发）。' : 'Please wait before resending (available after 60 seconds).')
+              ? (document.documentElement.lang === 'zh-CN' ? '请稍后再试（30 秒后可重发）。' : 'Please wait before resending (available after 30 seconds).')
               : (document.documentElement.lang === 'zh-CN' ? '重发失败，请稍后再试。' : 'Resend failed. Please try again later.');
           }
+          if (String((err && err.message) || '').includes('resend_cooldown')) {
+            startResendCooldown(30);
+          }
+        } finally {
+          if (!(resendCooldownRemaining > 0)) setButtonLoading(resendCodeBtn, false);
         }
       });
 

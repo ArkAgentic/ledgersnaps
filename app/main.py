@@ -9,7 +9,7 @@ from typing import Literal
 from typing import Optional
 from typing import cast
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -922,10 +922,11 @@ async def _extract_and_map_batch_core(
 
 @app.post("/api/v1/auth/signup")
 async def auth_signup(
+    background_tasks: BackgroundTasks,
     request: Request,
     full_name: str = Query(..., min_length=1),
     email: str = Query(..., min_length=3),
-    phone_local: str = Query(..., min_length=9),
+    phone_local: str = Query(..., min_length=5),
     password: str = Query(..., min_length=8),
     accept_terms: bool = Query(...),
 ) -> dict:
@@ -971,13 +972,17 @@ async def auth_signup(
     )
 
     verify_code = f"{int(token_hash[:12], 16) % 1000000:06d}"
-    try:
-        host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
-        scheme = (request.url.scheme if request else "https") or "https"
-        verify_link = f"{scheme}://{host}/api/v1/auth/signup/verify?token={raw_token}"
-        send_signup_verification_email(to_email=email_norm, verify_link=verify_link, verify_code=verify_code)
-    except Exception:
-        pass
+    host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
+    scheme = (request.url.scheme if request else "https") or "https"
+    verify_link = f"{scheme}://{host}/"
+
+    def _send_signup_code_email() -> None:
+        try:
+            send_signup_verification_email(to_email=email_norm, verify_link=verify_link, verify_code=verify_code)
+        except Exception:
+            return
+
+    background_tasks.add_task(_send_signup_code_email)
 
     out = {"status": "verification_sent"}
     if os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower() == "dev":
@@ -1059,7 +1064,7 @@ async def auth_signup_resend_code(
         if created_at:
             created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
             now_dt = datetime.now(created_dt.tzinfo) if created_dt.tzinfo else datetime.utcnow()
-            if (now_dt - created_dt).total_seconds() < 60:
+            if (now_dt - created_dt).total_seconds() < 30:
                 raise HTTPException(status_code=429, detail="resend_cooldown")
     except ValueError:
         pass
