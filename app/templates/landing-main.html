@@ -231,14 +231,6 @@
           <p id="verify-status" class="text-sm min-h-[20px]"></p>
         </div>
 
-        <div id="phone-verify-panel" class="hidden w-[80%] mx-auto space-y-3">
-          <p class="text-sm text-neutral-600" data-i18n="phone_code_hint">Now verify your phone to complete registration.</p>
-          <button id="btn-send-phone-otp" class="w-full h-11 rounded-xl border border-neutral-300 text-neutral-700 font-normal" data-i18n="send_phone_code">Send phone code</button>
-          <input id="phone-otp-input" type="text" inputmode="numeric" maxlength="6" class="w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" placeholder="6-digit phone code" />
-          <button id="btn-complete-phone-verify" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="complete_registration">Complete registration</button>
-          <button type="button" id="back-from-phone-verify" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
-          <p id="phone-otp-status" class="text-sm min-h-[20px]"></p>
-        </div>
 
       </div>
     </section>
@@ -277,8 +269,6 @@
           resend_code: 'Resend code',
           resend_in_prefix: 'Resend code in ',
           resend_in_suffix: 's',
-          phone_code_hint: 'Now verify your phone to complete registration.',
-          send_phone_code: 'Send phone code',
           full_name: 'Full Name',
           create_account: 'Create account',
           phone_local: 'Phone number',
@@ -320,8 +310,6 @@
           resend_code: '重新发送验证码',
           resend_in_prefix: '重新发送（',
           resend_in_suffix: '秒）',
-          phone_code_hint: '现在请验证你的手机号以完成注册。',
-          send_phone_code: '发送手机验证码',
           full_name: '姓名',
           create_account: '创建账户',
           phone_local: '手机号',
@@ -423,13 +411,12 @@
       const backBtn = document.getElementById('back-to-signin');
       const backFromCreateBtn = document.getElementById('back-from-create');
       const backFromVerifyBtn = document.getElementById('back-from-verify');
-      const backFromPhoneVerifyBtn = document.getElementById('back-from-phone-verify');
       const signinOauth = document.getElementById('signin-oauth');
       const resetPanel = document.getElementById('reset-panel');
       const signinCombined = document.getElementById('signin-combined');
       const createAccountPanel = document.getElementById('create-account-panel');
       const verifyCodePanel = document.getElementById('verify-code-panel');
-      const phoneVerifyPanel = document.getElementById('phone-verify-panel');
+      const phoneVerifyPanel = null;
       const signinSection = document.getElementById('signin-section');
       const signinFields = document.getElementById('signin-fields');
       const passwordRow = document.getElementById('password-row');
@@ -437,13 +424,10 @@
       const signupCta = document.getElementById('signup-cta');
       const resetStatus = document.getElementById('reset-status');
       const createStatus = document.getElementById('create-status');
-      const sendPhoneOtpBtn = document.getElementById('btn-send-phone-otp');
-      const phoneOtpInput = document.getElementById('phone-otp-input');
-      const phoneOtpStatus = document.getElementById('phone-otp-status');
       const verifyStatus = document.getElementById('verify-status');
       const verifyCodeInputs = Array.from(document.querySelectorAll('.verify-code-input'));
       const completeRegistrationBtn = document.getElementById('btn-complete-registration');
-      const completePhoneVerifyBtn = document.getElementById('btn-complete-phone-verify');
+      const completePhoneVerifyBtn = null;
       const resendCodeBtn = document.getElementById('btn-resend-code');
       let resendCooldownTimer = null;
       let resendCooldownRemaining = 0;
@@ -472,10 +456,6 @@
 
       function showVerifyMode() {
         switchPanel(verifyCodePanel);
-      }
-
-      function showPhoneVerifyMode() {
-        switchPanel(phoneVerifyPanel);
       }
 
       function setButtonLoading(btn, loading, loadingText) {
@@ -559,10 +539,6 @@
       if (backFromVerifyBtn) backFromVerifyBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showCreateMode();
-      });
-      if (backFromPhoneVerifyBtn) backFromPhoneVerifyBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        showVerifyMode();
       });
       const createPhoneInput = document.getElementById('create-phone-input');
       if (createPhoneInput) {
@@ -766,14 +742,11 @@
           if (verifyStatus) {
             verifyStatus.classList.remove('status-error');
             verifyStatus.classList.add('status-success');
-            verifyStatus.textContent = document.documentElement.lang === 'zh-CN' ? '邮箱验证成功，请继续手机号验证。' : 'Email verified. Continue with phone verification.';
+            verifyStatus.textContent = document.documentElement.lang === 'zh-CN' ? '邮箱验证成功，注册完成。' : 'Email verified. Registration complete.';
           }
-          if (phoneOtpInput) phoneOtpInput.value = '';
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-error', 'status-success');
-            phoneOtpStatus.textContent = '';
-          }
-          showPhoneVerifyMode();
+          try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+          document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+          window.location.href = j.redirect || '/dashboard/upload';
         } catch (err) {
           if (verifyStatus) {
             verifyStatus.classList.remove('status-success');
@@ -817,87 +790,6 @@
           }
         } finally {
           if (!(resendCooldownRemaining > 0)) setButtonLoading(resendCodeBtn, false);
-        }
-      });
-
-      if (sendPhoneOtpBtn) sendPhoneOtpBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const phoneUi = (document.getElementById('create-phone-input') || {}).value || '';
-        const phoneDigits = String(phoneUi).replace(/\D/g, '');
-        if (!/^\d{9}$/.test(phoneDigits)) {
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-success');
-            phoneOtpStatus.classList.add('status-error');
-            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请先填写正确手机号。' : 'Please enter a valid phone number first.';
-          }
-          return;
-        }
-        try {
-          const q = new URLSearchParams({ phone_e164: `+61${phoneDigits}` });
-          const r = await fetch('/api/v1/auth/phone/send-code?' + q.toString(), { method: 'POST' });
-          const j = await r.json();
-          if (!r.ok) throw new Error(j.detail || 'send_phone_otp_failed');
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-error');
-            phoneOtpStatus.classList.add('status-success');
-            phoneOtpStatus.textContent = j.dev_code
-              ? (document.documentElement.lang === 'zh-CN' ? `验证码已发送（dev: ${j.dev_code}）。` : `Phone code sent (dev: ${j.dev_code}).`)
-              : (document.documentElement.lang === 'zh-CN' ? '手机验证码已发送。' : 'Phone code sent.');
-          }
-        } catch (err) {
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-success');
-            phoneOtpStatus.classList.add('status-error');
-            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '发送手机验证码失败，请稍后重试。' : 'Failed to send phone code. Please try again.';
-          }
-        }
-      });
-
-      if (completePhoneVerifyBtn) completePhoneVerifyBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const email = (localStorage.getItem('signup_verify_email') || '').trim().toLowerCase();
-        const code = String((phoneOtpInput || {}).value || '').trim();
-        if (!email) {
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-success');
-            phoneOtpStatus.classList.add('status-error');
-            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '邮箱状态丢失，请重新注册。' : 'Email state missing. Please sign up again.';
-          }
-          return;
-        }
-        if (!/^\d{6}$/.test(code)) {
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-success');
-            phoneOtpStatus.classList.add('status-error');
-            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请输入 6 位手机验证码。' : 'Please enter a valid 6-digit phone code.';
-          }
-          return;
-        }
-
-        try {
-          const q = new URLSearchParams({ email, phone_otp_code: code });
-          const r = await fetch('/api/v1/auth/signup/phone/verify?' + q.toString(), { method: 'POST' });
-          const j = await r.json();
-          if (!r.ok || !j.token) throw new Error(j.detail || 'phone_verify_failed');
-          try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
-          document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-error');
-            phoneOtpStatus.classList.add('status-success');
-            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '注册成功，正在跳转…' : 'Registration complete. Redirecting...';
-          }
-          window.location.href = j.redirect || '/dashboard/upload';
-        } catch (err) {
-          if (phoneOtpStatus) {
-            phoneOtpStatus.classList.remove('status-success');
-            phoneOtpStatus.classList.add('status-error');
-            const m = String((err && err.message) || err || '');
-            phoneOtpStatus.textContent = m.includes('phone_verification_required')
-              ? (document.documentElement.lang === 'zh-CN' ? '手机验证码错误或未验证，请重新发送并输入。' : 'Phone verification code is missing or incorrect. Please send and enter the code.')
-              : (m.includes('email_verification_required')
-                ? (document.documentElement.lang === 'zh-CN' ? '请先完成邮箱验证码验证。' : 'Please complete email verification first.')
-                : (document.documentElement.lang === 'zh-CN' ? '手机号验证失败，请重试。' : 'Phone verification failed. Please try again.'));
-          }
         }
       });
 
