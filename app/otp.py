@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import random
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -67,19 +70,70 @@ class OtpProvider:
             raise RuntimeError(
                 "azure_sms_not_configured: set AZURE_COMMUNICATION_CONNECTION_STRING and AZURE_COMMUNICATION_SMS_FROM"
             )
-        try:
-            from azure.communication.sms import SmsClient  # type: ignore
-        except Exception as e:  # noqa: BLE001
-            raise RuntimeError("azure_communication_sms_sdk_missing: pip install azure-communication-sms") from e
 
         msg = f"Your LedgerSnaps verification code is: {code}. It expires in 10 minutes."
-        client = SmsClient.from_connection_string(conn)
-        resp = client.send(from_=sender, to=[phone_e164], message=msg, enable_delivery_report=False)
-        if not resp or not isinstance(resp, list):
-            raise RuntimeError("azure_sms_send_failed")
-        st = (resp[0].successful if hasattr(resp[0], "successful") else True)
-        if not st:
-            raise RuntimeError("azure_sms_send_failed")
+
+        # 1) Try native ACS SMS SDK first (legacy path).
+        try:
+            from azure.communication.sms import SmsClient  # type: ignore
+
+            client = SmsClient.from_connection_string(conn)
+            resp = client.send(from_=sender, to=[phone_e164], message=msg, enable_delivery_report=False)
+            if not resp or not isinstance(resp, list):
+                raise RuntimeError("azure_sms_send_failed")
+            st = (resp[0].successful if hasattr(resp[0], "successful") else True)
+            if st:
+                return
+        except Exception:
+            # Fall through to Messaging Connect preview API.
+            pass
+
+        # 2) Messaging Connect preview fallback (partner: Infobip).
+        infobip_api_key = os.getenv("INFOBIP_API_KEY", "").strip()
+        if not infobip_api_key:
+            raise RuntimeError("infobip_api_key_missing: set INFOBIP_API_KEY for Messaging Connect SMS")
+
+        endpoint = conn.split(";", 1)[0]
+        if endpoint.lower().startswith("endpoint="):
+            endpoint = endpoint[len("endpoint=") :]
+        endpoint = endpoint.rstrip("/")
+        url = f"{endpoint}/sms?api-version=2025-05-29-preview"
+
+        payload = {
+            "from": sender,
+            "to": [phone_e164],
+            "message": msg,
+            "options": {
+                "enableDeliveryReport": False,
+                "messagingConnect": {
+                    "partner": "infobip",
+                    "apiKey": infobip_api_key,
+                },
+            },
+        }
+
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                body = r.read().decode("utf-8", errors="ignore")
+                if r.status < 200 or r.status >= 300:
+                    raise RuntimeError(f"messaging_connect_sms_failed:{r.status}:{body[:300]}")
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8", errors="ignore")
+            except Exception:
+                detail = str(e)
+            raise RuntimeError(f"messaging_connect_sms_failed:{e.code}:{detail[:300]}") from e
 
 
 otp_provider = OtpProvider()
