@@ -414,18 +414,27 @@ def _render_template_or_500(name: str, missing_code: str) -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 async def landing_page() -> HTMLResponse:
-    return _render_template_or_500("landing-main.html", "landing_template_missing")
+    response = _render_template_or_500("landing-main.html", "landing_template_missing")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/terms", response_class=HTMLResponse)
 @app.get("/term", response_class=HTMLResponse)
 async def landing_terms_page() -> HTMLResponse:
-    return _render_template_or_500("landing-main.html", "landing_template_missing")
+    response = _render_template_or_500("landing-main.html", "landing_template_missing")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/privacy", response_class=HTMLResponse)
 async def landing_privacy_page() -> HTMLResponse:
-    return _render_template_or_500("landing-main.html", "landing_template_missing")
+    response = _render_template_or_500("landing-main.html", "landing_template_missing")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/playground", response_class=HTMLResponse)
