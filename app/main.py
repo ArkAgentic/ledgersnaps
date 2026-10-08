@@ -417,16 +417,6 @@ async def landing_page() -> HTMLResponse:
     return _render_template_or_500("landing-main.html", "landing_template_missing")
 
 
-@app.get("/privacy", response_class=HTMLResponse)
-async def privacy_page() -> HTMLResponse:
-    return _render_template_or_500("privacy.html", "privacy_template_missing")
-
-
-@app.get("/terms", response_class=HTMLResponse)
-async def terms_page() -> HTMLResponse:
-    return _render_template_or_500("terms.html", "terms_template_missing")
-
-
 @app.get("/playground", response_class=HTMLResponse)
 async def playground() -> HTMLResponse:
     html = """
