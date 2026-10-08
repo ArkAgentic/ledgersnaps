@@ -1043,6 +1043,42 @@ async def auth_signup_verify(request: Request, token: str = Query(..., min_lengt
     return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/dashboard/upload"}
 
 
+@app.post("/api/v1/auth/signup/resend-code")
+async def auth_signup_resend_code(
+    request: Request,
+    email: str = Query(..., min_length=3),
+) -> dict:
+    email_norm = str(email or "").strip().lower()
+    pending = get_latest_pending_signup_by_email(email_norm)
+    if not pending or str(pending.get("status")) != "pending":
+        return {"status": "accepted"}
+
+    created_at = str(pending.get("created_at") or "")
+    try:
+        if created_at:
+            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            now_dt = datetime.now(created_dt.tzinfo) if created_dt.tzinfo else datetime.utcnow()
+            if (now_dt - created_dt).total_seconds() < 60:
+                raise HTTPException(status_code=429, detail="resend_cooldown")
+    except ValueError:
+        pass
+
+    token_hash = str(pending.get("token_hash") or "")
+    verify_code = f"{int(token_hash[:12], 16) % 1000000:06d}" if token_hash else ""
+    if not verify_code:
+        return {"status": "accepted"}
+
+    try:
+        host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
+        scheme = (request.url.scheme if request else "https") or "https"
+        verify_link = f"{scheme}://{host}/"
+        send_signup_verification_email(to_email=email_norm, verify_link=verify_link, verify_code=verify_code)
+    except Exception:
+        pass
+
+    return {"status": "resent"}
+
+
 @app.post("/api/v1/auth/signup/verify-code")
 async def auth_signup_verify_code(
     email: str = Query(..., min_length=3),

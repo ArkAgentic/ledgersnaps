@@ -193,6 +193,7 @@
             <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
           </div>
           <button id="btn-complete-registration" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="complete_registration">Complete registration</button>
+          <button id="btn-resend-code" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 text-neutral-700 font-normal" data-i18n="resend_code">Resend code</button>
           <button type="button" id="back-from-verify" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
           <p id="verify-status" class="text-sm min-h-[20px]"></p>
         </div>
@@ -262,6 +263,7 @@
           create_hint: 'Create your account to start your free trial.',
           verify_code_hint: 'We sent a 6-digit code to your email. Enter it to complete registration.',
           complete_registration: 'Complete registration',
+          resend_code: 'Resend code',
           full_name: 'Full Name',
           create_account: 'Create account',
           phone_local: 'Phone number',
@@ -299,6 +301,7 @@
           create_hint: '创建账户以开始你的免费试用。',
           verify_code_hint: '我们已发送 6 位验证码到你的邮箱，请输入后完成注册。',
           complete_registration: '完成注册',
+          resend_code: '重新发送验证码',
           full_name: '姓名',
           create_account: '创建账户',
           phone_local: '手机号',
@@ -415,6 +418,7 @@
       const verifyStatus = document.getElementById('verify-status');
       const verifyCodeInputs = Array.from(document.querySelectorAll('.verify-code-input'));
       const completeRegistrationBtn = document.getElementById('btn-complete-registration');
+      const resendCodeBtn = document.getElementById('btn-resend-code');
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
 
@@ -678,6 +682,32 @@
             verifyStatus.textContent = (m.includes('invalid_or_expired_signup_code'))
               ? (document.documentElement.lang === 'zh-CN' ? '验证码无效或已过期，请重新注册获取新验证码。' : 'Code is invalid or expired. Please sign up again to get a new code.')
               : (document.documentElement.lang === 'zh-CN' ? '验证失败，请重试。' : 'Verification failed. Please try again.');
+          }
+        }
+      });
+
+      if (resendCodeBtn) resendCodeBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const email = (localStorage.getItem('signup_verify_email') || '').trim().toLowerCase();
+        if (!email) return;
+        try {
+          const q = new URLSearchParams({ email });
+          const r = await fetch('/api/v1/auth/signup/resend-code?' + q.toString(), { method: 'POST' });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.detail || 'resend_failed');
+          if (verifyStatus) {
+            verifyStatus.classList.remove('status-error');
+            verifyStatus.classList.add('status-success');
+            verifyStatus.textContent = document.documentElement.lang === 'zh-CN' ? '验证码已重新发送。' : 'Verification code resent.';
+          }
+        } catch (err) {
+          if (verifyStatus) {
+            verifyStatus.classList.remove('status-success');
+            verifyStatus.classList.add('status-error');
+            const m = String((err && err.message) || err || '');
+            verifyStatus.textContent = m.includes('resend_cooldown')
+              ? (document.documentElement.lang === 'zh-CN' ? '请稍后再试（60 秒后可重发）。' : 'Please wait before resending (available after 60 seconds).')
+              : (document.documentElement.lang === 'zh-CN' ? '重发失败，请稍后再试。' : 'Resend failed. Please try again later.');
           }
         }
       });
