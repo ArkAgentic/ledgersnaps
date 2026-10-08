@@ -127,34 +127,40 @@ def _signup_headers(to_email: str) -> dict[str, str]:
         "List-Unsubscribe": f"<{unsubscribe_url}>",
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         "X-Entity-Ref-ID": secrets.token_hex(16),
+        "X-Auto-Response-Suppress": "All",
     }
 
 
 def send_signup_verification_email(*, to_email: str, verify_link: str, verify_code: str) -> None:
+    _ = verify_link
     html_body = f"""<!doctype html>
 <html>
-  <body style=\"margin:0;padding:0;background:#f5f1eb;\">
-    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f5f1eb;padding:28px 0;\">
+  <body style=\"margin:0;padding:0;background:#f5f1eb;font-family:'Sora','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;\">
+    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f5f1eb;background-image:url('https://www.ledgersnaps.com/assets/images/landing-bg-light.png');background-size:cover;background-position:center;\">
       <tr>
-        <td align=\"center\">
-          <table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;\">
+        <td style=\"padding:28px 24px 32px 24px;\">
+          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;margin:0 auto;border-collapse:collapse;\">
             <tr>
-              <td style=\"padding:24px 28px 10px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#111827;\">
-                <div style=\"font-size:20px;font-weight:700;line-height:1.4;\">LedgerSnaps</div>
-                <div style=\"margin-top:14px;font-size:16px;line-height:1.6;color:#1f2937;\">Hi there,</div>
-                <div style=\"margin-top:10px;font-size:15px;line-height:1.7;color:#374151;\">Thanks for signing up. Please enter this 6-digit verification code on the signup page:</div>
+              <td style=\"padding:0 0 18px 0;\">
+                <img src=\"https://www.ledgersnaps.com/assets/images/logo-lockup-ledgersnaps-dark.svg\" alt=\"LedgerSnaps\" width=\"300\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
               </td>
             </tr>
             <tr>
-              <td style=\"padding:8px 28px 4px 28px;\">
+              <td style=\"font-size:16px;line-height:1.7;color:#111827;padding:0 0 10px 0;\">Hi there,</td>
+            </tr>
+            <tr>
+              <td style=\"font-size:15px;line-height:1.75;color:#1f2937;padding:0 0 16px 0;\">Thanks for signing up to LedgerSnaps. Please enter this 6-digit verification code on the signup page:</td>
+            </tr>
+            <tr>
+              <td style=\"padding:0 0 16px 0;\">
                 <div style=\"display:inline-block;background:#111827;color:#ffffff;border-radius:10px;padding:12px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:28px;font-weight:700;letter-spacing:0.24em;\">{verify_code}</div>
               </td>
             </tr>
             <tr>
-              <td style=\"padding:8px 28px 24px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#4b5563;\">
-                <div style=\"font-size:14px;line-height:1.7;\">For your security, this code expires in 30 minutes. If you didn’t request this, you can safely ignore this email.</div>
-                <div style=\"margin-top:18px;font-size:14px;line-height:1.7;color:#111827;\">Warm regards,<br/>LedgerSnaps team</div>
-              </td>
+              <td style=\"font-size:14px;line-height:1.75;color:#374151;padding:0 0 18px 0;\">For your security, this code expires in 30 minutes. If you didn’t request this, you can safely ignore this email.</td>
+            </tr>
+            <tr>
+              <td style=\"font-size:14px;line-height:1.75;color:#111827;\">Warm regards,<br/>LedgerSnaps team</td>
             </tr>
           </table>
         </td>
