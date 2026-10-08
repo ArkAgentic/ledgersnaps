@@ -136,7 +136,7 @@ def _signup_headers(to_email: str) -> dict[str, str]:
 def render_signup_verification_email_html(*, verify_code: str) -> str:
     return f"""<!doctype html>
 <html>
-  <body style=\"margin:0;padding:0;background:#f5f1eb;font-family:'Sora','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;\">
+  <body style=\"margin:0;padding:0;background:#f5f1eb;font-family:'Monda','Sora',sans-serif;\">
     <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f5f1eb;background-image:url('https://www.ledgersnaps.com/assets/images/landing-bg-light.png');background-size:cover;background-position:center;\">
       <tr>
         <td style=\"padding:28px 24px 32px 24px;\">
