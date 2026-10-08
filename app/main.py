@@ -58,6 +58,7 @@ from .store import (
     get_job_result_owned,
     list_jobs_owned,
     mark_password_reset_token_used,
+    mark_pending_signup_token_email_verified,
     mark_pending_signup_token_used,
     upsert_oauth_identity,
     upsert_local_credential,
@@ -927,7 +928,6 @@ async def auth_signup(
     phone_local: str = Query(..., min_length=9),
     password: str = Query(..., min_length=8),
     accept_terms: bool = Query(...),
-    phone_otp_code: str = Query(..., min_length=4),
 ) -> dict:
     if not accept_terms:
         raise HTTPException(status_code=400, detail="terms_not_accepted")
@@ -946,8 +946,6 @@ async def auth_signup(
         raise HTTPException(status_code=409, detail="email_already_registered")
     if get_user_by_phone(phone_e164):
         raise HTTPException(status_code=409, detail="phone_already_registered")
-    if not otp_provider.verify_code(phone_e164, phone_otp_code):
-        raise HTTPException(status_code=400, detail="phone_verification_required")
 
     signup_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
@@ -1052,8 +1050,8 @@ async def auth_signup_resend_code(
     email: str = Query(..., min_length=3),
 ) -> dict:
     email_norm = str(email or "").strip().lower()
-    pending = get_latest_pending_signup_by_email(email_norm)
-    if not pending or str(pending.get("status")) != "pending":
+    pending = get_latest_pending_signup_by_email(email_norm, status="pending")
+    if not pending:
         return {"status": "accepted"}
 
     created_at = str(pending.get("created_at") or "")
@@ -1088,7 +1086,7 @@ async def auth_signup_verify_code(
     code: str = Query(..., min_length=6, max_length=6),
 ) -> dict:
     email_norm = str(email or "").strip().lower()
-    pending = get_latest_pending_signup_by_email(email_norm)
+    pending = get_latest_pending_signup_by_email(email_norm, status="pending")
     if not pending or str(pending.get("status")) != "pending":
         raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
 
@@ -1106,19 +1104,40 @@ async def auth_signup_verify_code(
     if not expected or str(code).strip() != expected:
         raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
 
-    rec = get_pending_signup_token(token_hash)
-    if not rec or str(rec.get("status")) != "pending":
+    mark_pending_signup_token_email_verified(token_hash)
+    return {"status": "email_verified"}
+
+
+@app.post("/api/v1/auth/signup/phone/verify")
+async def auth_signup_phone_verify(
+    email: str = Query(..., min_length=3),
+    phone_otp_code: str = Query(..., min_length=4),
+) -> dict:
+    email_norm = str(email or "").strip().lower()
+    rec = get_latest_pending_signup_by_email(email_norm, status="email_verified")
+    if not rec:
+        raise HTTPException(status_code=400, detail="email_verification_required")
+
+    exp = str(rec.get("expires_at") or "")
+    if not exp:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+    try:
+        if datetime.utcnow() > datetime.fromisoformat(exp):
+            raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
+    except ValueError:
         raise HTTPException(status_code=400, detail="invalid_or_expired_signup_code")
 
-    email_norm = str(rec.get("email") or "").strip().lower()
     phone_e164 = str(rec.get("phone_e164") or "").strip()
-    full_name = str(rec.get("full_name") or "").strip()
+    if not otp_provider.verify_code(phone_e164, phone_otp_code):
+        raise HTTPException(status_code=400, detail="phone_verification_required")
 
     if get_user_by_email(email_norm) or get_user_by_phone(phone_e164):
-        mark_pending_signup_token_used(token_hash)
+        mark_pending_signup_token_used(str(rec.get("token_hash") or ""))
         raise HTTPException(status_code=409, detail="account_already_exists")
 
     user_id = f"u-{secrets.token_hex(8)}"
+    full_name = str(rec.get("full_name") or "").strip()
+
     try:
         record_trial_claim(
             user_id,
@@ -1147,7 +1166,7 @@ async def auth_signup_verify_code(
         signup_ip=str(rec.get("signup_ip") or "") or None,
         user_agent=str(rec.get("user_agent") or "") or None,
     )
-    mark_pending_signup_token_used(token_hash)
+    mark_pending_signup_token_used(str(rec.get("token_hash") or ""))
 
     token_out = issue_dev_token(user_id=user_id, tenant_id="default")
     return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/dashboard/upload"}

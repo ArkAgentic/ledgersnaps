@@ -182,23 +182,8 @@
           <p id="reset-status" class="mt-3 text-sm text-neutral-600"></p>
         </div>
 
-        <div id="verify-code-panel" class="hidden w-[80%] mx-auto space-y-3">
-          <p class="text-sm text-neutral-600" data-i18n="verify_code_hint">We sent a 6-digit code to your email. Enter it to complete registration.</p>
-          <div class="flex items-center justify-between gap-2">
-            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
-            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
-            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
-            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
-            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
-            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
-          </div>
-          <button id="btn-complete-registration" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="complete_registration">Complete registration</button>
-          <button id="btn-resend-code" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 text-neutral-700 font-normal" data-i18n="resend_code">Resend code</button>
-          <button type="button" id="back-from-verify" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
-          <p id="verify-status" class="text-sm min-h-[20px]"></p>
-        </div>
-
         <div id="create-account-panel" class="hidden w-[80%] mx-auto space-y-3">
+          <div>
             <label class="text-sm text-neutral-700 block" data-i18n="full_name">Full Name</label>
             <input id="create-name-input" type="text" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
           </div>
@@ -225,14 +210,34 @@
             <input id="accept-terms-checkbox" type="checkbox" class="mt-1 h-4 w-4 rounded border-neutral-300 text-[#E32652] focus:ring-[#E32652]" />
             <span><span data-i18n="accept_prefix">I accept LedgerSnaps' </span><a href="/terms" class="underline hover:text-neutral-800" data-i18n="terms">Terms & Conditions</a><span data-i18n="accept_middle"> & </span><a href="/privacy" class="underline hover:text-neutral-800" data-i18n="privacy">Privacy Policy</a></span>
           </label>
-          <div id="phone-otp-panel" class="space-y-2">
-            <button id="btn-send-phone-otp" class="w-full h-11 rounded-xl border border-neutral-300 text-neutral-700 font-normal" data-i18n="send_phone_code">Send phone code</button>
-            <input id="phone-otp-input" type="text" inputmode="numeric" maxlength="6" class="w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" placeholder="6-digit phone code" />
-            <p id="phone-otp-status" class="text-sm min-h-[20px]"></p>
-          </div>
           <button id="btn-create-account" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="create_account">Create account</button>
           <button type="button" id="back-from-create" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
           <p id="create-status" class="text-sm min-h-[20px]"></p>
+        </div>
+
+        <div id="verify-code-panel" class="hidden w-[80%] mx-auto space-y-3">
+          <p class="text-sm text-neutral-600" data-i18n="verify_code_hint">We sent a 6-digit code to your email. Enter it to continue.</p>
+          <div class="flex items-center justify-between gap-2">
+            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="verify-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+          </div>
+          <button id="btn-complete-registration" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="confirm_email_code">Confirm email code</button>
+          <button id="btn-resend-code" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 text-neutral-700 font-normal" data-i18n="resend_code">Resend code</button>
+          <button type="button" id="back-from-verify" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
+          <p id="verify-status" class="text-sm min-h-[20px]"></p>
+        </div>
+
+        <div id="phone-verify-panel" class="hidden w-[80%] mx-auto space-y-3">
+          <p class="text-sm text-neutral-600" data-i18n="phone_code_hint">Now verify your phone to complete registration.</p>
+          <button id="btn-send-phone-otp" class="w-full h-11 rounded-xl border border-neutral-300 text-neutral-700 font-normal" data-i18n="send_phone_code">Send phone code</button>
+          <input id="phone-otp-input" type="text" inputmode="numeric" maxlength="6" class="w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" placeholder="6-digit phone code" />
+          <button id="btn-complete-phone-verify" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="complete_registration">Complete registration</button>
+          <button type="button" id="back-from-phone-verify" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
+          <p id="phone-otp-status" class="text-sm min-h-[20px]"></p>
         </div>
 
       </div>
@@ -266,9 +271,11 @@
           send_reset: 'Send reset link',
           back_short: 'Back',
           create_hint: 'Create your account to start your free trial.',
-          verify_code_hint: 'We sent a 6-digit code to your email. Enter it to complete registration.',
+          verify_code_hint: 'We sent a 6-digit code to your email. Enter it to continue.',
+          confirm_email_code: 'Confirm email code',
           complete_registration: 'Complete registration',
           resend_code: 'Resend code',
+          phone_code_hint: 'Now verify your phone to complete registration.',
           send_phone_code: 'Send phone code',
           full_name: 'Full Name',
           create_account: 'Create account',
@@ -305,9 +312,11 @@
           send_reset: '发送重置链接',
           back_short: '返回',
           create_hint: '创建账户以开始你的免费试用。',
-          verify_code_hint: '我们已发送 6 位验证码到你的邮箱，请输入后完成注册。',
+          verify_code_hint: '我们已发送 6 位验证码到你的邮箱，请输入后继续。',
+          confirm_email_code: '确认邮箱验证码',
           complete_registration: '完成注册',
           resend_code: '重新发送验证码',
+          phone_code_hint: '现在请验证你的手机号以完成注册。',
           send_phone_code: '发送手机验证码',
           full_name: '姓名',
           create_account: '创建账户',
@@ -410,11 +419,13 @@
       const backBtn = document.getElementById('back-to-signin');
       const backFromCreateBtn = document.getElementById('back-from-create');
       const backFromVerifyBtn = document.getElementById('back-from-verify');
+      const backFromPhoneVerifyBtn = document.getElementById('back-from-phone-verify');
       const signinOauth = document.getElementById('signin-oauth');
       const resetPanel = document.getElementById('reset-panel');
       const signinCombined = document.getElementById('signin-combined');
       const createAccountPanel = document.getElementById('create-account-panel');
       const verifyCodePanel = document.getElementById('verify-code-panel');
+      const phoneVerifyPanel = document.getElementById('phone-verify-panel');
       const signinSection = document.getElementById('signin-section');
       const signinFields = document.getElementById('signin-fields');
       const passwordRow = document.getElementById('password-row');
@@ -429,11 +440,12 @@
       const verifyStatus = document.getElementById('verify-status');
       const verifyCodeInputs = Array.from(document.querySelectorAll('.verify-code-input'));
       const completeRegistrationBtn = document.getElementById('btn-complete-registration');
+      const completePhoneVerifyBtn = document.getElementById('btn-complete-phone-verify');
       const resendCodeBtn = document.getElementById('btn-resend-code');
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
 
-      const PANELS = [signinCombined, resetPanel, createAccountPanel, verifyCodePanel].filter(Boolean);
+      const PANELS = [signinCombined, resetPanel, createAccountPanel, verifyCodePanel, phoneVerifyPanel].filter(Boolean);
       PANELS.forEach((el) => el.classList.add('auth-panel'));
 
       function switchPanel(targetEl) {
@@ -454,6 +466,10 @@
 
       function showVerifyMode() {
         switchPanel(verifyCodePanel);
+      }
+
+      function showPhoneVerifyMode() {
+        switchPanel(phoneVerifyPanel);
       }
 
       function showSigninMode() {
@@ -481,6 +497,10 @@
       if (backFromVerifyBtn) backFromVerifyBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showCreateMode();
+      });
+      if (backFromPhoneVerifyBtn) backFromPhoneVerifyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showVerifyMode();
       });
       const createPhoneInput = document.getElementById('create-phone-input');
       if (createPhoneInput) {
@@ -576,7 +596,6 @@
             phone_local: phoneLocal,
             password: pwd,
             accept_terms: 'true',
-            phone_otp_code: String(phoneOtpInput.value || '').trim(),
           });
           const r = await fetch('/api/v1/auth/signup?' + q.toString(), { method: 'POST' });
           const j = await r.json();
@@ -618,7 +637,7 @@
             }
             if (m.includes('phone_verification_required')) {
               markError(phoneOtpInput);
-              return (document.documentElement.lang === 'zh-CN' ? '手机验证码错误或未验证，请重新发送并输入。' : 'Phone verification code is missing or incorrect. Please send and enter the code.');
+              return (document.documentElement.lang === 'zh-CN' ? '手机验证码将在邮箱验证后进行。' : 'Phone verification happens after email verification.');
             }
             if (m.includes('invalid_phone') || m.includes('9 digits')) {
               markError(phoneInput);
@@ -644,8 +663,8 @@
             verifyStatus.classList.remove('status-error', 'status-success');
             verifyStatus.classList.add('status-success');
             verifyStatus.textContent = document.documentElement.lang === 'zh-CN'
-              ? '验证码已发送，请输入 6 位验证码完成注册。'
-              : 'Verification code sent. Enter the 6-digit code to complete registration.';
+              ? '验证码已发送，请输入 6 位验证码继续。'
+              : 'Verification code sent. Enter the 6-digit code to continue.';
           }
           showVerifyMode();
         } catch (e) {
@@ -686,15 +705,18 @@
           const q = new URLSearchParams({ email, code });
           const r = await fetch('/api/v1/auth/signup/verify-code?' + q.toString(), { method: 'POST' });
           const j = await r.json();
-          if (!r.ok || !j.token) throw new Error(j.detail || 'verify_code_failed');
-          try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
-          document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+          if (!r.ok || j.status !== 'email_verified') throw new Error(j.detail || 'verify_code_failed');
           if (verifyStatus) {
             verifyStatus.classList.remove('status-error');
             verifyStatus.classList.add('status-success');
-            verifyStatus.textContent = document.documentElement.lang === 'zh-CN' ? '验证成功，正在跳转…' : 'Verified. Redirecting...';
+            verifyStatus.textContent = document.documentElement.lang === 'zh-CN' ? '邮箱验证成功，请继续手机号验证。' : 'Email verified. Continue with phone verification.';
           }
-          window.location.href = j.redirect || '/dashboard/upload';
+          if (phoneOtpInput) phoneOtpInput.value = '';
+          if (phoneOtpStatus) {
+            phoneOtpStatus.classList.remove('status-error', 'status-success');
+            phoneOtpStatus.textContent = '';
+          }
+          showPhoneVerifyMode();
         } catch (err) {
           if (verifyStatus) {
             verifyStatus.classList.remove('status-success');
@@ -762,6 +784,54 @@
             phoneOtpStatus.classList.remove('status-success');
             phoneOtpStatus.classList.add('status-error');
             phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '发送手机验证码失败，请稍后重试。' : 'Failed to send phone code. Please try again.';
+          }
+        }
+      });
+
+      if (completePhoneVerifyBtn) completePhoneVerifyBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const email = (localStorage.getItem('signup_verify_email') || '').trim().toLowerCase();
+        const code = String((phoneOtpInput || {}).value || '').trim();
+        if (!email) {
+          if (phoneOtpStatus) {
+            phoneOtpStatus.classList.remove('status-success');
+            phoneOtpStatus.classList.add('status-error');
+            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '邮箱状态丢失，请重新注册。' : 'Email state missing. Please sign up again.';
+          }
+          return;
+        }
+        if (!/^\d{6}$/.test(code)) {
+          if (phoneOtpStatus) {
+            phoneOtpStatus.classList.remove('status-success');
+            phoneOtpStatus.classList.add('status-error');
+            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '请输入 6 位手机验证码。' : 'Please enter a valid 6-digit phone code.';
+          }
+          return;
+        }
+
+        try {
+          const q = new URLSearchParams({ email, phone_otp_code: code });
+          const r = await fetch('/api/v1/auth/signup/phone/verify?' + q.toString(), { method: 'POST' });
+          const j = await r.json();
+          if (!r.ok || !j.token) throw new Error(j.detail || 'phone_verify_failed');
+          try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+          document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+          if (phoneOtpStatus) {
+            phoneOtpStatus.classList.remove('status-error');
+            phoneOtpStatus.classList.add('status-success');
+            phoneOtpStatus.textContent = document.documentElement.lang === 'zh-CN' ? '注册成功，正在跳转…' : 'Registration complete. Redirecting...';
+          }
+          window.location.href = j.redirect || '/dashboard/upload';
+        } catch (err) {
+          if (phoneOtpStatus) {
+            phoneOtpStatus.classList.remove('status-success');
+            phoneOtpStatus.classList.add('status-error');
+            const m = String((err && err.message) || err || '');
+            phoneOtpStatus.textContent = m.includes('phone_verification_required')
+              ? (document.documentElement.lang === 'zh-CN' ? '手机验证码错误或未验证，请重新发送并输入。' : 'Phone verification code is missing or incorrect. Please send and enter the code.')
+              : (m.includes('email_verification_required')
+                ? (document.documentElement.lang === 'zh-CN' ? '请先完成邮箱验证码验证。' : 'Please complete email verification first.')
+                : (document.documentElement.lang === 'zh-CN' ? '手机号验证失败，请重试。' : 'Phone verification failed. Please try again.'));
           }
         }
       });
