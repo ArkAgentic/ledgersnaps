@@ -344,10 +344,6 @@
         });
         const lbl = document.getElementById('lang-current-label');
         if (lbl) lbl.textContent = dict.lang_label;
-        const resendBtnEl = document.getElementById('btn-resend-code');
-        if (resendBtnEl && typeof resendCooldownRemaining !== 'undefined' && resendCooldownRemaining > 0) {
-          resendBtnEl.textContent = cooldownLabel(resendCooldownRemaining);
-        }
         const cr = document.getElementById('footer-copyright');
         if (cr && dict.copyright) {
           const parts = String(dict.copyright).split('||');
