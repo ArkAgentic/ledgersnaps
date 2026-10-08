@@ -136,10 +136,10 @@ def _signup_headers(to_email: str) -> dict[str, str]:
 def render_signup_verification_email_html(*, verify_code: str) -> str:
     return f"""<!doctype html>
 <html>
-  <body style=\"margin:0;padding:0;background:#f5f1eb;font-family:'Monda','Sora',sans-serif;\">
-    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f5f1eb;background-image:url('https://www.ledgersnaps.com/assets/images/landing-bg-light.png');background-size:cover;background-position:center;\">
+  <body style=\"margin:0;padding:0;background:#f5f1eb url('https://www.ledgersnaps.com/assets/images/landing-bg-light-fast.jpg') center/cover no-repeat;font-family:'Monda','Sora',sans-serif;\">
+    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f5f1eb url('https://www.ledgersnaps.com/assets/images/landing-bg-light-fast.jpg') center/cover no-repeat;\">
       <tr>
-        <td style=\"padding:28px 24px 32px 24px;\">
+        <td style=\"padding:28px 24px 32px 24px;background:#f5f1eb url('https://www.ledgersnaps.com/assets/images/landing-bg-light-fast.jpg') center/cover no-repeat;\">
           <!--[if gte mso 9]>
           <v:rect xmlns:v=\"urn:schemas-microsoft-com:vml\" fill=\"true\" stroke=\"false\" style=\"width:640px;height:560px;\">
             <v:fill type=\"frame\" src=\"https://www.ledgersnaps.com/assets/images/landing-bg-light.png\" color=\"#f5f1eb\" />
@@ -148,7 +148,7 @@ def render_signup_verification_email_html(*, verify_code: str) -> str:
           <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;margin:0 auto;border-collapse:collapse;\">
             <tr>
               <td style=\"padding:0 0 12px 0;\">
-                <img src=\"https://www.ledgersnaps.com/assets/images/logo-with-text.png\" alt=\"Logo with text\" title=\"Logo with text\" width=\"220\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
+                <img src=\"https://www.ledgersnaps.com/assets/images/Logo%20with%20text%20(black).png\" alt=\"Logo with text\" title=\"Logo with text\" width=\"220\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
               </td>
             </tr>
             <tr>
@@ -157,9 +157,9 @@ def render_signup_verification_email_html(*, verify_code: str) -> str:
                 <p style=\"margin:0 0 12px;font-size:15px;line-height:1.65;color:#0f172a;\">Thanks for joining LedgerSnaps.</p>
                 <p style=\"margin:0 0 22px;font-size:15px;line-height:1.65;color:#0f172a;\">Please use this 6-digit code to complete your sign up:</p>
                 <p style=\"margin:0 0 22px;\"><span style=\"display:inline-block;padding:12px 22px;border-radius:12px;background:#0f172a;color:#ffffff;font-size:30px;letter-spacing:7px;font-weight:700;\">{verify_code}</span></p>
-                <p style=\"margin:0 0 10px;font-size:13px;line-height:1.65;color:#475569;\">This code expires in 30 minutes.</p>
+                <p style=\"margin:0 0 10px;font-size:13px;line-height:1.65;color:#475569;\">This code expires in 10 mins.</p>
                 <p style=\"margin:0 0 10px;font-size:13px;line-height:1.65;color:#475569;\">If you did not request this, you can safely ignore this email.</p>
-                <p style=\"margin:16px 0 0;font-size:14px;line-height:1.65;color:#0f172a;\">Warm regards,<br/>LedgerSnaps team</p>
+                <p style=\"margin:16px 0 0;font-size:14px;line-height:1.65;color:#0f172a;\">Kind regards,<br/>LedgerSnaps team</p>
               </td>
             </tr>
           </table>
@@ -183,7 +183,7 @@ def send_signup_verification_email(*, to_email: str, verify_link: str, verify_co
         "Thanks for signing up for LedgerSnaps.\n"
         f"Your 6-digit verification code is: {verify_code}\n\n"
         "Enter this code on the signup page to continue.\n"
-        "This code expires in 30 minutes.\n\n"
+        "This code expires in 10 mins.\n\n"
         "If you did not request this, you can ignore this email.\n\n"
         "LedgerSnaps team"
     )

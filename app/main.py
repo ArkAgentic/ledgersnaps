@@ -965,7 +965,7 @@ async def auth_signup(
 
     raw_token = secrets.token_urlsafe(24)
     token_hash = _sha256_hex(raw_token)
-    expires_at = (datetime.utcnow() + timedelta(minutes=30)).isoformat()
+    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
 
     create_pending_signup_token(
         token_hash=token_hash,
