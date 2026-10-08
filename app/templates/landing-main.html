@@ -332,9 +332,15 @@
         }
       };
 
+      function normalizeLang(lang) {
+        const v = String(lang || '').toLowerCase();
+        return (v === 'zh' || v === 'cn') ? 'zh' : 'en';
+      }
+
       function setLang(lang) {
-        const dict = I18N[lang] || I18N.en;
-        document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+        const normalized = normalizeLang(lang);
+        const dict = I18N[normalized] || I18N.en;
+        document.documentElement.lang = normalized === 'zh' ? 'zh-CN' : 'en';
         document.querySelectorAll('[data-i18n]').forEach((el) => {
           const key = el.getAttribute('data-i18n');
           if (key && dict[key]) el.textContent = dict[key];
@@ -357,10 +363,10 @@
             cr.textContent = dict.copyright;
           }
         }
-        localStorage.setItem('ledgersnaps_lang', lang);
+        localStorage.setItem('ledgersnaps_lang', normalized);
       }
 
-      const saved = localStorage.getItem('ledgersnaps_lang') || 'en';
+      const saved = normalizeLang(localStorage.getItem('ledgersnaps_lang') || 'en');
       setLang(saved);
 
       
@@ -545,7 +551,7 @@
 
       function showLeftLegal(kind, updateHistory = true) {
         if (!leftMainContent || !leftLegalPanel || !leftLegalTitle || !leftLegalContent) return;
-        const lang = (localStorage.getItem('ledgersnaps_lang') || 'en').replace('cn', 'zh');
+        const lang = normalizeLang(localStorage.getItem('ledgersnaps_lang') || document.documentElement.lang || 'en');
         const isZh = lang === 'zh';
         const TERMS_HTML = {
           en: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. Service scope</h3><p>LedgerSnaps provides invoice data extraction and accounting workflow support features. Features may change as the product evolves.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. Account responsibilities</h3><p>You are responsible for account security, lawful usage, and ensuring uploaded data is authorized for processing.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. Billing and trials</h3><p>Trial credits, paid plans, and top-up credits are subject to plan terms presented at purchase. Fees are non-refundable unless required by law.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. Availability and limitations</h3><p>Service availability depends on third-party infrastructure and upstream providers. We do not guarantee uninterrupted operation.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. Acceptable use</h3><p>You must not use the service for unlawful, abusive, or fraudulent activity. We may suspend accounts that violate policy.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. Liability</h3><p>To the extent allowed by law, LedgerSnaps is not liable for indirect or consequential damages from use of the service.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. Contact</h3><p>For terms questions, contact: <a class=\"underline\" href=\"mailto:legal@ledgersnaps.com\">legal@ledgersnaps.com</a></p></section>\n</div>`,
