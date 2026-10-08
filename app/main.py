@@ -927,6 +927,7 @@ async def auth_signup(
     phone_local: str = Query(..., min_length=9),
     password: str = Query(..., min_length=8),
     accept_terms: bool = Query(...),
+    phone_otp_code: str = Query(..., min_length=4),
 ) -> dict:
     if not accept_terms:
         raise HTTPException(status_code=400, detail="terms_not_accepted")
@@ -945,6 +946,8 @@ async def auth_signup(
         raise HTTPException(status_code=409, detail="email_already_registered")
     if get_user_by_phone(phone_e164):
         raise HTTPException(status_code=409, detail="phone_already_registered")
+    if not otp_provider.verify_code(phone_e164, phone_otp_code):
+        raise HTTPException(status_code=400, detail="phone_verification_required")
 
     signup_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
