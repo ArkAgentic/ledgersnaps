@@ -347,6 +347,7 @@
         });
         const lbl = document.getElementById('lang-current-label');
         if (lbl) lbl.textContent = dict.lang_label;
+        localStorage.setItem('ledgersnaps_lang', normalized);
         const legalPanelEl = document.getElementById('left-legal-panel');
         const legalTitleEl = document.getElementById('left-legal-title');
         if (legalPanelEl && !legalPanelEl.classList.contains('hidden')) {
