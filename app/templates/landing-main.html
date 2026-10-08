@@ -97,7 +97,7 @@
         </div>
       </header>
 
-      <div class="flex-1 flex items-center pt-10 md:pt-14">
+      <div id="left-main-content" class="flex-1 flex items-center pt-10 md:pt-14">
         <div>
           <h1 class="text-4xl md:text-5xl font-semibold tracking-[0.01em] text-white leading-[1.2] md:leading-[1.22] max-w-4xl">
             <span data-i18n="hero_title">Turn receipts and invoices into Xero or MYOB drafts in seconds.</span>
@@ -136,6 +136,14 @@
               <img src="/assets/images/providers/claude-ai-icon.svg" alt="Claude AI" loading="lazy" />
             </div>
           </div>
+        </div>
+      </div>
+
+      <div id="left-legal-panel" class="hidden flex-1 pt-10 md:pt-14 text-white overflow-y-auto">
+        <div class="max-w-4xl w-full">
+          <h2 id="left-legal-title" class="text-3xl md:text-4xl font-semibold leading-tight mb-6">Terms & Conditions</h2>
+          <div id="left-legal-content" class="space-y-6 text-sm md:text-base leading-7 text-white/95"></div>
+          <button type="button" id="left-legal-back" class="inline-block mt-6 text-neutral-200 hover:text-white underline">Back to home</button>
         </div>
       </div>
 
@@ -208,7 +216,7 @@
           </div>
           <label class="flex items-start gap-2 text-sm text-neutral-600">
             <input id="accept-terms-checkbox" type="checkbox" class="mt-1 h-4 w-4 rounded border-neutral-300 text-[#E32652] focus:ring-[#E32652]" />
-            <span><span data-i18n="accept_prefix">I accept LedgerSnaps' </span><a href="/terms" class="underline hover:text-neutral-800" data-i18n="terms">Terms & Conditions</a><span data-i18n="accept_middle"> & </span><a href="/privacy" class="underline hover:text-neutral-800" data-i18n="privacy">Privacy Policy</a></span>
+            <span><span data-i18n="accept_prefix">I accept LedgerSnaps' </span><button type="button" class="underline hover:text-neutral-800" data-open-legal="terms" data-i18n="terms">Terms & Conditions</button><span data-i18n="accept_middle"> & </span><button type="button" class="underline hover:text-neutral-800" data-open-legal="privacy" data-i18n="privacy">Privacy Policy</button></span>
           </label>
           <button id="btn-create-account" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="create_account">Create account</button>
           <button type="button" id="back-from-create" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
@@ -253,6 +261,7 @@
           pricing: 'Pricing',
           support: 'Support',
           contact: 'Contact Us',
+          back_to_home: 'Back to home',
           btn_xero: 'Continue with Xero',
           btn_myob: 'Continue with MYOB',
           email: 'Email Address',
@@ -294,6 +303,7 @@
           pricing: '价格方案',
           support: '技术支持',
           contact: '联系我们',
+          back_to_home: '返回首页',
           btn_xero: '使用 Xero 继续',
           btn_myob: '使用 MYOB 继续',
           email: '邮箱',
@@ -332,6 +342,10 @@
         });
         const lbl = document.getElementById('lang-current-label');
         if (lbl) lbl.textContent = dict.lang_label;
+        if (leftLegalPanel && !leftLegalPanel.classList.contains('hidden')) {
+          const activeKind = leftLegalTitle && String(leftLegalTitle.textContent || '').toLowerCase().includes('privacy') ? 'privacy' : 'terms';
+          showLeftLegal(activeKind);
+        }
         const cr = document.getElementById('footer-copyright');
         if (cr && dict.copyright) {
           const parts = String(dict.copyright).split('||');
@@ -434,6 +448,11 @@
 
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
+      const leftMainContent = document.getElementById('left-main-content');
+      const leftLegalPanel = document.getElementById('left-legal-panel');
+      const leftLegalTitle = document.getElementById('left-legal-title');
+      const leftLegalContent = document.getElementById('left-legal-content');
+      const leftLegalBack = document.getElementById('left-legal-back');
 
       const PANELS = [signinCombined, resetPanel, createAccountPanel, verifyCodePanel, phoneVerifyPanel].filter(Boolean);
       PANELS.forEach((el) => el.classList.add('auth-panel'));
@@ -514,6 +533,37 @@
         }
       }
 
+      function showLeftMain() {
+        if (leftMainContent) leftMainContent.classList.remove('hidden');
+        if (leftLegalPanel) leftLegalPanel.classList.add('hidden');
+      }
+
+      function showLeftLegal(kind) {
+        if (!leftMainContent || !leftLegalPanel || !leftLegalTitle || !leftLegalContent) return;
+        const lang = (localStorage.getItem('ledgersnaps_lang') || 'en').replace('cn', 'zh');
+        const isZh = lang === 'zh';
+        const TERMS_HTML = {
+          en: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. Service scope</h3><p>LedgerSnaps provides invoice data extraction and accounting workflow support features. Features may change as the product evolves.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. Account responsibilities</h3><p>You are responsible for account security, lawful usage, and ensuring uploaded data is authorized for processing.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. Billing and trials</h3><p>Trial credits, paid plans, and top-up credits are subject to plan terms presented at purchase. Fees are non-refundable unless required by law.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. Availability and limitations</h3><p>Service availability depends on third-party infrastructure and upstream providers. We do not guarantee uninterrupted operation.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. Acceptable use</h3><p>You must not use the service for unlawful, abusive, or fraudulent activity. We may suspend accounts that violate policy.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. Liability</h3><p>To the extent allowed by law, LedgerSnaps is not liable for indirect or consequential damages from use of the service.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. Contact</h3><p>For terms questions, contact: <a class=\"underline\" href=\"mailto:legal@ledgersnaps.com\">legal@ledgersnaps.com</a></p></section>\n</div>`,
+          zh: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. 服务范围</h3><p>LedgerSnaps 提供发票数据提取与会计流程支持功能，功能可能随产品迭代调整。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. 账户责任</h3><p>你需要对账户安全、合法使用以及上传数据的处理授权负责。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. 计费与试用</h3><p>试用额度、付费计划与充值额度以购买时展示的条款为准；除法律另有规定外，费用不予退还。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. 可用性与限制</h3><p>服务可用性依赖第三方基础设施与上游服务，我们不保证服务持续不中断。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. 可接受使用</h3><p>你不得将服务用于违法、滥用或欺诈活动；违反政策的账户可能被暂停。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. 责任限制</h3><p>在法律允许范围内，LedgerSnaps 不对使用服务导致的间接或后果性损失承担责任。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. 联系方式</h3><p>条款相关问题请联系：<a class=\"underline\" href=\"mailto:legal@ledgersnaps.com\">legal@ledgersnaps.com</a></p></section>\n</div>`,
+        };
+        const PRIVACY_HTML = {
+          en: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. What we collect</h3><p>We collect account data (name, email, phone), authentication data (including OAuth identifiers), invoice metadata and extraction outputs, service usage logs, and security telemetry required to operate LedgerSnaps.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. How we use data</h3><p>We use data to authenticate users, process invoice extraction, create draft records in connected systems, provide support, prevent abuse, and improve service reliability.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. Third-party services</h3><p>We may process data through trusted providers required for service delivery, such as cloud infrastructure, payment processing, email, and connected accounting platforms (including Xero when you authorize it).</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. Data retention and security</h3><p>We retain data only as needed for legal, operational, and security purposes. We apply access controls, encryption in transit, and secure secret handling for production systems.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. Your rights</h3><p>You can request access, correction, deletion, or export of your personal data where applicable. You can also revoke connected app permissions in your provider account settings.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. Contact</h3><p>For privacy requests, contact: <a class=\"underline\" href=\"mailto:privacy@ledgersnaps.com\">privacy@ledgersnaps.com</a></p></section>\n</div>`,
+          zh: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. 我们收集的信息</h3><p>我们会收集账户信息（姓名、邮箱、手机号）、认证信息（包括 OAuth 标识）、发票元数据与提取结果、服务使用日志以及维持 LedgerSnaps 运行所需的安全遥测信息。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. 信息使用目的</h3><p>我们使用这些数据进行身份验证、发票提取处理、在已连接系统中创建草稿记录、提供客户支持、防止滥用并提升服务稳定性。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. 第三方服务</h3><p>在提供服务所必需的场景下，我们可能通过可信第三方处理数据，例如云基础设施、支付、邮件服务以及已授权的会计平台（包括 Xero）。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. 数据留存与安全</h3><p>我们仅在法律、运营与安全所需范围内保留数据，并采用访问控制、传输加密及生产环境密钥安全管理。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. 你的权利</h3><p>在适用法律范围内，你可申请访问、更正、删除或导出个人数据；你也可以在第三方平台账户设置中撤销应用授权。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. 联系方式</h3><p>隐私相关请求请联系：<a class=\"underline\" href=\"mailto:privacy@ledgersnaps.com\">privacy@ledgersnaps.com</a></p></section>\n</div>`,
+        };
+
+        const dict = I18N[isZh ? 'zh' : 'en'] || I18N.en;
+        if (leftLegalBack) leftLegalBack.textContent = dict.back_to_home || 'Back to home';
+        if (kind === 'privacy') {
+          leftLegalTitle.textContent = dict.privacy || (isZh ? '隐私政策' : 'Privacy Policy');
+          leftLegalContent.innerHTML = isZh ? PRIVACY_HTML.zh : PRIVACY_HTML.en;
+        } else {
+          leftLegalTitle.textContent = dict.terms || (isZh ? '条款与条件' : 'Terms & Conditions');
+          leftLegalContent.innerHTML = isZh ? TERMS_HTML.zh : TERMS_HTML.en;
+        }
+        leftMainContent.classList.add('hidden');
+        leftLegalPanel.classList.remove('hidden');
+      }
+
       function showSigninMode() {
         switchPanel(signinCombined);
         if (resetStatus) resetStatus.textContent = '';
@@ -539,6 +589,17 @@
       if (backFromVerifyBtn) backFromVerifyBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showCreateMode();
+      });
+      if (leftLegalBack) leftLegalBack.addEventListener('click', (e) => {
+        e.preventDefault();
+        showLeftMain();
+      });
+      document.querySelectorAll('[data-open-legal]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const kind = btn.getAttribute('data-open-legal') || 'terms';
+          showLeftLegal(kind);
+        });
       });
       const createPhoneInput = document.getElementById('create-phone-input');
       if (createPhoneInput) {
