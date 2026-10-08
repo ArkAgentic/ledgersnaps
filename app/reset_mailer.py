@@ -128,6 +128,8 @@ def _signup_headers(to_email: str) -> dict[str, str]:
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         "X-Entity-Ref-ID": secrets.token_hex(16),
         "X-Auto-Response-Suppress": "All",
+        "Precedence": "bulk",
+        "X-Priority": "3",
     }
 
 
@@ -139,30 +141,33 @@ def send_signup_verification_email(*, to_email: str, verify_link: str, verify_co
     <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f5f1eb;background-image:url('https://www.ledgersnaps.com/assets/images/landing-bg-light.png');background-size:cover;background-position:center;\">
       <tr>
         <td style=\"padding:28px 24px 32px 24px;\">
+          <!--[if gte mso 9]>
+          <v:rect xmlns:v=\"urn:schemas-microsoft-com:vml\" fill=\"true\" stroke=\"false\" style=\"width:640px;height:560px;\">
+            <v:fill type=\"frame\" src=\"https://www.ledgersnaps.com/assets/images/landing-bg-light.png\" color=\"#f5f1eb\" />
+            <v:textbox inset=\"0,0,0,0\">
+          <![endif]-->
           <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;margin:0 auto;border-collapse:collapse;\">
             <tr>
               <td style=\"padding:0 0 18px 0;\">
-                <img src=\"https://www.ledgersnaps.com/assets/images/logo-lockup-ledgersnaps-dark.svg\" alt=\"LedgerSnaps\" width=\"300\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
+                <img src=\"https://www.ledgersnaps.com/assets/images/logo-transparent.png\" alt=\"LedgerSnaps\" width=\"320\" style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;\" />
               </td>
             </tr>
             <tr>
-              <td style=\"font-size:16px;line-height:1.7;color:#111827;padding:0 0 10px 0;\">Hi there,</td>
-            </tr>
-            <tr>
-              <td style=\"font-size:15px;line-height:1.75;color:#1f2937;padding:0 0 16px 0;\">Thanks for signing up to LedgerSnaps. Please enter this 6-digit verification code on the signup page:</td>
-            </tr>
-            <tr>
-              <td style=\"padding:0 0 16px 0;\">
-                <div style=\"display:inline-block;background:#111827;color:#ffffff;border-radius:10px;padding:12px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:28px;font-weight:700;letter-spacing:0.24em;\">{verify_code}</div>
+              <td style=\"padding:28px 34px;border-radius:20px;background:rgba(255,255,255,0.90);border:1px solid rgba(12,21,40,0.08);\">
+                <p style=\"margin:0 0 12px;font-size:15px;line-height:1.65;color:#0f172a;\">Hi there,</p>
+                <p style=\"margin:0 0 12px;font-size:15px;line-height:1.65;color:#0f172a;\">Thanks for joining LedgerSnaps.</p>
+                <p style=\"margin:0 0 22px;font-size:15px;line-height:1.65;color:#0f172a;\">Please use this 6-digit code to complete your sign up:</p>
+                <p style=\"margin:0 0 22px;\"><span style=\"display:inline-block;padding:12px 22px;border-radius:12px;background:#0f172a;color:#ffffff;font-size:30px;letter-spacing:7px;font-weight:700;\">{verify_code}</span></p>
+                <p style=\"margin:0 0 10px;font-size:13px;line-height:1.65;color:#475569;\">This code expires in 30 minutes.</p>
+                <p style=\"margin:0 0 10px;font-size:13px;line-height:1.65;color:#475569;\">If you did not request this, you can safely ignore this email.</p>
+                <p style=\"margin:16px 0 0;font-size:14px;line-height:1.65;color:#0f172a;\">Warm regards,<br/>LedgerSnaps team</p>
               </td>
-            </tr>
-            <tr>
-              <td style=\"font-size:14px;line-height:1.75;color:#374151;padding:0 0 18px 0;\">For your security, this code expires in 30 minutes. If you didn’t request this, you can safely ignore this email.</td>
-            </tr>
-            <tr>
-              <td style=\"font-size:14px;line-height:1.75;color:#111827;\">Warm regards,<br/>LedgerSnaps team</td>
             </tr>
           </table>
+          <!--[if gte mso 9]>
+            </v:textbox>
+          </v:rect>
+          <![endif]-->
         </td>
       </tr>
     </table>
