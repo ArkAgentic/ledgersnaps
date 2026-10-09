@@ -345,8 +345,8 @@
         localStorage.setItem('ledgersnaps_lang', normalized);
         const legalPanelEl = document.getElementById('left-legal-panel');
         if (legalPanelEl && !legalPanelEl.classList.contains('hidden')) {
-          const activeKind = currentLegalKind || ((window.location.pathname || '') === '/privacy' ? 'privacy' : 'terms');
-          showLeftLegal(activeKind, false);
+          const activeKind = currentLegalKind || getPanelKindFromPath(window.location.pathname || '/');
+          if (activeKind) showLeftLegal(activeKind, false);
         }
         const cr = document.getElementById('footer-copyright');
         if (cr && dict.copyright) {
@@ -449,6 +449,13 @@
       let resendCooldownRemaining = 0;
       let currentLegalKind = null;
 
+      function getPanelKindFromPath(path) {
+        if (path === '/privacy') return 'privacy';
+        if (path === '/terms' || path === '/term') return 'terms';
+        if (path === '/pricing') return 'pricing';
+        return null;
+      }
+
       const sendResetBtn = document.getElementById('btn-send-reset');
       const createAccountBtn = document.getElementById('btn-create-account');
       const leftMainContent = document.getElementById('left-main-content');
@@ -547,7 +554,7 @@
 
       function showLeftLegal(kind, updateHistory = true) {
         if (!leftMainContent || !leftLegalPanel || !leftLegalTitle || !leftLegalContent) return;
-        const legalKind = kind === 'privacy' ? 'privacy' : 'terms';
+        const legalKind = kind === 'privacy' ? 'privacy' : (kind === 'pricing' ? 'pricing' : 'terms');
         currentLegalKind = legalKind;
         const lang = normalizeLang(localStorage.getItem('ledgersnaps_lang') || document.documentElement.lang || 'en');
         const isZh = lang === 'zh';
@@ -555,6 +562,11 @@
           en: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. Acceptance and scope</h3><p>These Terms govern your access to and use of LedgerSnaps websites, APIs, and related services. By using the Service, you agree to these Terms and our Privacy Policy.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. Eligibility and account security</h3><p>You must provide accurate registration details and keep your credentials secure. You are responsible for all activity under your account, including actions by authorized team members.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. Customer data and authority</h3><p>You retain ownership of your uploaded documents and extracted outputs. You represent that you have all rights and permissions required to submit and process that data, including data belonging to clients or third parties.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. Permitted use and restrictions</h3><p>You may not use the Service for unlawful, fraudulent, abusive, or security-harming activity, including unauthorized access attempts, malware distribution, spam, scraping beyond allowed interfaces, or infringement of third-party rights.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. AI extraction and output accuracy</h3><p>LedgerSnaps provides automated extraction and workflow assistance. Outputs may contain errors and require human review. You remain responsible for accounting decisions, filings, and downstream use of extracted data.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. Third-party integrations</h3><p>If you connect third-party platforms (including accounting providers), you authorize LedgerSnaps to access and exchange data with those services on your behalf. Your use of those services is also subject to their own terms and policies.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. Plans, billing, and credits</h3><p>Paid plans, trial allowances, and top-up credits are billed under the pricing terms shown at purchase. Except where required by law, fees are non-refundable. We may suspend access for overdue accounts.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">8. Availability and changes</h3><p>We may update features, limits, or interfaces over time. While we aim for reliable service, uninterrupted availability is not guaranteed, particularly where dependencies involve cloud or third-party providers.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">9. Suspension and termination</h3><p>We may suspend or terminate accounts that materially breach these Terms, create legal risk, or threaten platform security. You may stop using the Service at any time.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">10. Liability limitation</h3><p>To the maximum extent permitted by law, LedgerSnaps is not liable for indirect, incidental, special, consequential, or punitive damages, or for loss of profits, data, goodwill, or business interruption.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">11. Contact</h3><p>Questions about these Terms: <a class=\"underline\" href=\"mailto:support@ledgersnaps.com\">support@ledgersnaps.com</a></p></section>\n</div>`,
           zh: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. 适用范围与接受</h3><p>本服务条款适用于你对 LedgerSnaps 网站、API 及相关服务的访问与使用。使用本服务即表示你同意本条款与隐私政策。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. 账户资格与安全</h3><p>你需提供真实、准确的注册信息并妥善保管账户凭据。你账户下（含授权团队成员）的所有操作由你负责。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. 客户数据与授权</h3><p>你对上传文档与提取结果保有权利。你声明并保证：你已取得提交和处理该等数据所需的全部权利与授权（含客户或第三方数据）。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. 合法使用与限制</h3><p>你不得将本服务用于违法、欺诈、滥用或危害安全的行为，包括未授权访问、传播恶意软件、垃圾信息、超出允许接口的数据抓取、侵犯第三方权利等。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. AI 提取与结果准确性</h3><p>LedgerSnaps 提供自动化提取与流程辅助。提取结果可能存在误差，需人工复核。你仍需对会计判断、申报及后续使用承担责任。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. 第三方集成</h3><p>当你连接第三方平台（包括会计系统）时，即授权 LedgerSnaps 代表你与该平台进行必要的数据访问与交换。你对第三方平台的使用同时受其条款与政策约束。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. 计费、套餐与额度</h3><p>付费计划、试用额度及充值额度以购买时展示的价格与规则为准。除法律另有规定外，费用不予退还。逾期未支付时我们可暂停服务。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">8. 可用性与服务变更</h3><p>我们可能持续更新功能、限额与接口。我们将尽力提供稳定服务，但在云基础设施或第三方依赖场景下，不保证绝对不中断。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">9. 暂停与终止</h3><p>若账户严重违反本条款、引发法律风险或危及平台安全，我们可暂停或终止服务。你也可随时停止使用。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">10. 责任限制</h3><p>在法律允许范围内，LedgerSnaps 不对间接、附带、特殊、后果性或惩罚性损失承担责任，亦不对利润、数据、商誉或业务中断损失承担责任。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">11. 联系方式</h3><p>条款相关问题请联系：<a class=\"underline\" href=\"mailto:support@ledgersnaps.com\">support@ledgersnaps.com</a></p></section>\n</div>`,
         };
+        const PRICING_HTML = {
+          en: `<div class=\"space-y-6\">\n<section class=\"text-center\"><p class=\"text-white/80 text-sm md:text-base\">Simple plans for firms and teams processing invoices at scale.</p></section>\n<section class=\"grid grid-cols-1 md:grid-cols-2 gap-4 text-left\">\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Starter</h3><p class=\"text-2xl font-bold mt-2\">$19<span class=\"text-sm font-medium text-white/70 ml-1\">/mo</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Up to 200 invoices / month</li><li>Email code authentication</li><li>Basic extraction workflow</li></ul></article>\n<article class=\"rounded-2xl border border-[#E32652] bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Growth</h3><p class=\"text-2xl font-bold mt-2\">$79<span class=\"text-sm font-medium text-white/70 ml-1\">/mo</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Up to 2,000 invoices / month</li><li>Priority queue processing</li><li>Xero & MYOB ready</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Scale</h3><p class=\"text-2xl font-bold mt-2\">$199<span class=\"text-sm font-medium text-white/70 ml-1\">/mo</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Up to 8,000 invoices / month</li><li>Advanced validation controls</li><li>Team roles & audit trails</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Enterprise</h3><p class=\"text-2xl font-bold mt-2\">Custom</p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Custom quotas & SLAs</li><li>Dedicated onboarding</li><li>Compliance support</li></ul></article>\n</section>\n</div>`,
+          zh: `<div class=\"space-y-6\">\n<section class=\"text-center\"><p class=\"text-white/80 text-sm md:text-base\">先提供四档方案框架，后续我们再逐项细调价格与文案。</p></section>\n<section class=\"grid grid-cols-1 md:grid-cols-2 gap-4 text-left\">\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Starter</h3><p class=\"text-2xl font-bold mt-2\">$19<span class=\"text-sm font-medium text-white/70 ml-1\">/月</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>每月最多 200 张发票</li><li>邮箱验证码登录</li><li>基础提取流程</li></ul></article>\n<article class=\"rounded-2xl border border-[#E32652] bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Growth</h3><p class=\"text-2xl font-bold mt-2\">$79<span class=\"text-sm font-medium text-white/70 ml-1\">/月</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>每月最多 2,000 张发票</li><li>优先队列处理</li><li>支持 Xero 与 MYOB</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Scale</h3><p class=\"text-2xl font-bold mt-2\">$199<span class=\"text-sm font-medium text-white/70 ml-1\">/月</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>每月最多 8,000 张发票</li><li>高级校验控制</li><li>团队角色与审计轨迹</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Enterprise</h3><p class=\"text-2xl font-bold mt-2\">定制</p><ul class=\"mt-3 space-y-1 text-white/85\"><li>自定义配额与 SLA</li><li>专属上手支持</li><li>合规支持</li></ul></article>\n</section>\n</div>`,
+        };
+
         const PRIVACY_HTML = {
           en: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. Scope and applicability</h3><p>This Privacy Policy explains how LedgerSnaps collects, uses, stores, and shares personal information when you use our websites, applications, APIs, and related services.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. Information we collect</h3><p>We may collect account profile details, authentication identifiers, contact data, billing metadata, device/browser logs, support communications, uploaded files, extracted invoice fields, and integration metadata from connected platforms.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. How we use your information</h3><p>We use information to operate the Service, authenticate accounts, process extraction workflows, deliver customer support, secure our systems, meet legal obligations, and improve service quality and reliability.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. Legal basis and consent</h3><p>Where required, we process data based on contract necessity, legitimate interests, legal obligations, or your consent. You may withdraw consent for optional processing where applicable.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. Sharing and subprocessors</h3><p>We share data only with service providers needed to deliver the platform (for example cloud hosting, email, payments, and accounting integrations) and only under contractual and security controls.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. Data retention</h3><p>We retain personal information only for as long as needed for service delivery, compliance, audit, dispute handling, and security purposes, then delete or de-identify it in accordance with our retention standards.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. Security measures</h3><p>We implement technical and organizational safeguards, including access controls, encryption in transit, least-privilege practices, and monitoring designed to protect data against unauthorized access, loss, or misuse.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">8. International transfers</h3><p>Where data is processed across regions, we apply appropriate safeguards consistent with applicable privacy laws and contractual requirements.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">9. Your privacy rights</h3><p>Depending on your jurisdiction, you may have rights to access, correct, delete, restrict, object, or export personal information. We respond to verified requests within applicable legal timelines.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">10. Cookies and analytics</h3><p>We may use cookies and similar technologies for session management, security, and product analytics. You can manage cookie preferences through your browser settings where supported.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">11. Policy updates</h3><p>We may update this Policy from time to time. Material changes will be posted through the Service with an updated effective date.</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">12. Contact</h3><p>Privacy questions or requests: <a class=\"underline\" href=\"mailto:support@ledgersnaps.com\">support@ledgersnaps.com</a></p></section>\n</div>`,
           zh: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. 适用范围</h3><p>本隐私政策说明 LedgerSnaps 在你使用网站、应用、API 及相关服务时，如何收集、使用、存储和共享个人信息。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. 我们收集的信息</h3><p>我们可能收集账户资料、认证标识、联系方式、计费元数据、设备与浏览日志、支持沟通记录、上传文件、发票提取字段以及已连接平台的集成信息。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. 信息使用目的</h3><p>我们使用信息用于提供与运行服务、账户鉴权、执行提取流程、客户支持、系统安全防护、履行法律义务以及改进服务质量与稳定性。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. 处理依据与同意</h3><p>在适用法律要求下，我们基于合同履行、合法利益、法律义务或你的同意处理数据。对可选处理活动，你可在适用范围内撤回同意。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. 数据共享与处理方</h3><p>我们仅在提供平台所必需的范围内，与受合同和安全约束的服务提供方共享数据（如云基础设施、邮件、支付、会计平台集成）。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. 数据留存</h3><p>我们仅在服务交付、合规审计、争议处理和安全需要的期限内保留个人信息，期满后按照留存标准删除或去标识化处理。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. 安全措施</h3><p>我们实施技术与组织层面的安全控制，包括访问控制、传输加密、最小权限和安全监控，以防止未授权访问、丢失或滥用。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">8. 跨境传输</h3><p>当数据需要跨区域处理时，我们会依据适用隐私法律与合同要求采取相应保护措施。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">9. 你的隐私权利</h3><p>依据所在法域，你可能享有访问、更正、删除、限制处理、反对处理或数据导出的权利。我们将在法定期限内响应经核验的请求。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">10. Cookies 与分析</h3><p>我们可能使用 Cookies 及类似技术用于会话管理、安全控制和产品分析。你可在浏览器设置中管理相关偏好（如支持）。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">11. 政策更新</h3><p>我们可能不时更新本政策。重大变更会在服务内公告，并更新生效日期。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">12. 联系方式</h3><p>隐私相关问题或请求请联系：<a class=\"underline\" href=\"mailto:support@ledgersnaps.com\">support@ledgersnaps.com</a></p></section>\n</div>`,
@@ -565,6 +577,9 @@
         if (legalKind === 'privacy') {
           leftLegalTitle.textContent = dict.privacy || (isZh ? '隐私政策' : 'Privacy Policy');
           leftLegalContent.innerHTML = isZh ? PRIVACY_HTML.zh : PRIVACY_HTML.en;
+        } else if (legalKind === 'pricing') {
+          leftLegalTitle.textContent = dict.pricing || (isZh ? '价格方案' : 'Pricing');
+          leftLegalContent.innerHTML = isZh ? PRICING_HTML.zh : PRICING_HTML.en;
         } else {
           leftLegalTitle.textContent = dict.terms || (isZh ? '服务条款' : 'Terms & Conditions');
           leftLegalContent.innerHTML = isZh ? TERMS_HTML.zh : TERMS_HTML.en;
@@ -572,7 +587,7 @@
         leftMainContent.classList.add('hidden');
         leftLegalPanel.classList.remove('hidden');
         if (updateHistory) {
-          history.replaceState({}, '', legalKind === 'privacy' ? '/privacy' : '/terms');
+          history.replaceState({}, '', legalKind === 'privacy' ? '/privacy' : (legalKind === 'pricing' ? '/pricing' : '/terms'));
         }
       }
 
@@ -614,11 +629,20 @@
         });
       });
 
+      document.querySelectorAll('a[href="/pricing"]').forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          showLeftLegal('pricing', true);
+        });
+      });
+
       const pathName = window.location.pathname || '/';
       if (pathName === '/terms' || pathName === '/term') {
         showLeftLegal('terms', false);
       } else if (pathName === '/privacy') {
         showLeftLegal('privacy', false);
+      } else if (pathName === '/pricing') {
+        showLeftLegal('pricing', false);
       }
       const createPhoneInput = document.getElementById('create-phone-input');
       if (createPhoneInput) {
