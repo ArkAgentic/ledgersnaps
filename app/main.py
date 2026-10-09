@@ -1155,8 +1155,15 @@ async def auth_signup_verify_code(
     phone_e164 = str(pending.get("phone_e164") or "").strip()
     full_name = str(pending.get("full_name") or "").strip()
 
-    if get_user_by_email(email_norm) or get_user_by_phone(phone_e164):
-        raise HTTPException(status_code=409, detail="account_already_exists")
+    existing_user = get_user_by_email(email_norm) or get_user_by_phone(phone_e164)
+    if existing_user:
+        token_out = issue_dev_token(user_id=str(existing_user.get("user_id")), tenant_id="default")
+        return {
+            "status": "signed_in",
+            "user_id": str(existing_user.get("user_id")),
+            "token": token_out,
+            "redirect": "/console",
+        }
 
     try:
         record_trial_claim(

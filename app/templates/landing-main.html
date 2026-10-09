@@ -930,7 +930,9 @@
             const m = String((err && err.message) || err || '');
             verifyStatus.textContent = (m.includes('invalid_or_expired_signup_code'))
               ? (document.documentElement.lang === 'zh-CN' ? '验证码无效或已过期，请重新注册获取新验证码。' : 'Code is invalid or expired. Please sign up again to get a new code.')
-              : (document.documentElement.lang === 'zh-CN' ? '验证失败，请重试。' : 'Verification failed. Please try again.');
+              : (m.includes('account_already_exists')
+                ? (document.documentElement.lang === 'zh-CN' ? '该账号已存在，请直接登录。' : 'Account already exists. Please sign in directly.')
+                : (document.documentElement.lang === 'zh-CN' ? '验证失败，请重试。' : 'Verification failed. Please try again.'));
           }
         }
       });
