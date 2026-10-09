@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+import re
 import secrets
 import time
 import hashlib
@@ -409,6 +410,14 @@ def _render_template_or_500(name: str, missing_code: str) -> HTMLResponse:
     footer_partial = templates_dir / "partials" / "footer-shared.html"
     if "{{FOOTER_SHARED}}" in html and footer_partial.exists():
         html = html.replace("{{FOOTER_SHARED}}", footer_partial.read_text(encoding="utf-8"))
+
+    # Cache-bust static assets to prevent stale logo/CSS on rapid deploys.
+    try:
+        version = os.getenv("GITHUB_SHA", "")[:7] or str(int(template.stat().st_mtime))
+        html = re.sub(r"(/assets/[^\"'\s)]+)", lambda m: f"{m.group(1)}?v={version}", html)
+    except Exception:
+        pass
+
     return HTMLResponse(content=html)
 
 
