@@ -16,8 +16,21 @@
     .console-bg-dark { background:#0b1526 linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser-fast.jpg') center center / cover no-repeat fixed; }
     .sidebar-surface { background: rgba(255,255,255,0.92); backdrop-filter: blur(6px); }
     .dark .sidebar-surface { background-image: linear-gradient(rgba(8,15,35,.62), rgba(8,15,35,.62)), url('/assets/images/landing-bg-dark-laser-fast.jpg'); background-position: left top; background-repeat: no-repeat; background-size: auto; background-color: rgba(8,15,35,.94); }
+
     #main-pane { background: transparent; }
-    .dark #main-pane { background: transparent; }
+    body.console-bg-light #main-pane {
+      background: linear-gradient(rgba(246,247,251,.10), rgba(246,247,251,.10)), url('/assets/images/landing-bg-light-fast.jpg');
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: cover;
+    }
+    body.console-bg-dark #main-pane {
+      background: linear-gradient(rgba(3,9,24,.52), rgba(3,9,24,.60)), url('/assets/images/landing-bg-dark-laser-fast.jpg');
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: cover;
+    }
+
 
     .dark #sidebar .menu-option,
     .dark #sidebar .menu-option .menu-label,
@@ -108,14 +121,6 @@
         body.classList.toggle('console-bg-light', !dark);
         shell.classList.toggle('dark', dark);
 
-        if (dark) {
-          body.style.background = "#0b1526 linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser-fast.jpg') center center / cover no-repeat fixed";
-          body.style.color = '#ffffff';
-        } else {
-          body.style.background = "#f6f7fb url('/assets/images/landing-bg-light-fast.jpg') center center / cover no-repeat";
-          body.style.color = '#000000';
-        }
-
         if (bgToggleIcon) bgToggleIcon.textContent = dark ? '☀' : '☾';
         if (sidebarLogo) {
           sidebarLogo.src = dark ? sidebarLogo.getAttribute('data-logo-dark') : sidebarLogo.getAttribute('data-logo-light');
@@ -162,7 +167,7 @@
         const accountTitle = document.getElementById('account-title');
         if (accountTitle) accountTitle.textContent = map['Account'];
 
-        if (langToggleLabel) langToggleLabel.textContent = zh ? 'CN' : 'EN';
+        if (langToggleLabel) langToggleLabel.textContent = zh ? 'EN' : 'CN';
         localStorage.setItem(LANG_KEY, zh ? 'zh' : 'en');
       }
 
