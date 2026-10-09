@@ -57,8 +57,7 @@
 
         <div id="account-block" class="border-t border-gray-200 pt-4 space-y-1">
           <div id="account-title" class="menu-label px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Account</div>
-          <button data-title="Analytics" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="bar-chart-3" class="h-4 w-4 text-current"></i></div><span class="menu-label text-sm font-medium">Analytics</span></button>
-          <button data-title="Settings" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="settings" class="h-4 w-4 text-current"></i></div><span class="menu-label text-sm font-medium">Settings</span></button>
+                    <button data-title="Settings" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="settings" class="h-4 w-4 text-current"></i></div><span class="menu-label text-sm font-medium">Settings</span></button>
           <button data-title="Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4 text-current"></i></div><span class="menu-label text-sm font-medium">Support</span></button>
         </div>
 
@@ -87,7 +86,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 justify-items-center">
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <div class="p-2 bg-blue-50 rounded-lg"><i data-lucide="badge-check" class="h-5 w-5 text-blue-600"></i></div>
+              <i data-lucide="badge-check" class="h-5 w-5 text-blue-600"></i>
             </div>
             <h3 id="kpi-plan-title" class="font-medium text-gray-600 mb-1">Account Level</h3>
             <p id="kpi-plan" class="text-2xl font-bold text-gray-900">-</p>
@@ -96,7 +95,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <div class="p-2 bg-green-50 rounded-lg"><i data-lucide="sparkles" class="h-5 w-5 text-green-600"></i></div>
+              <i data-lucide="sparkles" class="h-5 w-5 text-green-600"></i>
             </div>
             <h3 id="kpi-ai-title" class="font-medium text-gray-600 mb-1">AI Extraction Remaining</h3>
             <p id="kpi-ai-remaining" class="text-2xl font-bold text-gray-900">-</p>
@@ -105,7 +104,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <div class="p-2 bg-purple-50 rounded-lg"><i data-lucide="link" class="h-5 w-5 text-purple-600"></i></div>
+              <i data-lucide="link" class="h-5 w-5 text-purple-600"></i>
             </div>
             <h3 id="kpi-xero-title" class="font-medium text-gray-600 mb-1">Xero Connection</h3>
             <p id="kpi-xero" class="text-2xl font-bold text-gray-900">-</p>
@@ -114,7 +113,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <div class="p-2 bg-orange-50 rounded-lg"><i data-lucide="database" class="h-5 w-5 text-orange-600"></i></div>
+              <i data-lucide="database" class="h-5 w-5 text-orange-600"></i>
             </div>
             <h3 id="kpi-jobs-title" class="font-medium text-gray-600 mb-1">Processing Queue</h3>
             <p id="kpi-jobs" class="text-2xl font-bold text-gray-900">-</p>
@@ -241,13 +240,13 @@
           if (jobs) {
             const list = Array.isArray(jobs.jobs) ? jobs.jobs : [];
             text('kpi-jobs', String(list.length));
-            const in progress = list.filter(j => (j.status || '').toLowerCase() === 'in progress').length;
-            text('kpi-jobs-sub', `${in progress} in progress`);
+            const inProgress = list.filter(j => (j.status || '').toLowerCase() === 'processing').length;
+            text('kpi-jobs-sub', `${inProgress} processing`);
             text('recent-count', `${list.length} total`);
             const container = document.getElementById('recent-jobs');
             if (container) {
               if (!list.length) {
-                container.innerHTML = '<div class="text-gray-500">No in progress jobs yet</div>';
+                container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
               } else {
                 container.innerHTML = list.slice(0,5).map(j => {
                   const status = (j.status || '-').toUpperCase();
@@ -262,7 +261,7 @@
         } catch (e) {
           text('kpi-plan-sub', 'Failed to load live data');
           const container = document.getElementById('recent-jobs');
-          if (container) container.innerHTML = '<div class="text-red-500">Failed to load in progress jobs</div>';
+          if (container) container.innerHTML = '<div class="text-red-500">Failed to load jobs</div>';
         }
       }
 
@@ -283,7 +282,6 @@
           'Exports (Excel)':'导出 (Excel)',
           'ABN/GST Validation':'ABN/GST 校验',
           'Pricing & Top-up':'套餐与充值',
-          'Analytics':'分析',
           'Settings':'设置',
           'Support':'支持',
           'Account':'账户',
@@ -306,7 +304,6 @@
           'Exports (Excel)':'Exports (Excel)',
           'ABN/GST Validation':'ABN/GST Validation',
           'Pricing & Top-up':'Pricing & Top-up',
-          'Analytics':'Analytics',
           'Settings':'Settings',
           'Support':'Support',
           'Account':'Account',
