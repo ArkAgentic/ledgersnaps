@@ -5,11 +5,127 @@ import os
 import sqlite3
 import threading
 import uuid
+
+import psycopg
+from psycopg.rows import dict_row
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 _DB_LOCK = threading.Lock()
 _CONN: Optional[sqlite3.Connection] = None
+_PG_CONN: Optional[psycopg.Connection] = None
+_PG_SCHEMA_READY = False
+
+
+def _pg_dsn() -> Optional[str]:
+    dsn = (os.getenv("LEDGERSNAPS_PG_DSN") or os.getenv("DATABASE_URL") or "").strip()
+    return dsn or None
+
+
+def _pg_enabled() -> bool:
+    return _pg_dsn() is not None
+
+
+def _ensure_pg_conn() -> psycopg.Connection:
+    global _PG_CONN
+    if _PG_CONN is not None and not _PG_CONN.closed:
+        return _PG_CONN
+    dsn = _pg_dsn()
+    if not dsn:
+        raise RuntimeError("postgres_dsn_missing")
+    conn = psycopg.connect(dsn, autocommit=False, row_factory=dict_row)
+    _PG_CONN = conn
+    _ensure_pg_auth_schema(conn)
+    return conn
+
+
+def _ensure_pg_auth_schema(conn: psycopg.Connection) -> None:
+    global _PG_SCHEMA_READY
+    if _PG_SCHEMA_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+              user_id TEXT PRIMARY KEY,
+              email TEXT NOT NULL,
+              phone_e164 TEXT NOT NULL,
+              full_name TEXT NOT NULL,
+              signup_ip TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_entitlements (
+              user_id TEXT PRIMARY KEY,
+              phone_e164 TEXT,
+              phone_hash TEXT,
+              device_fingerprint TEXT,
+              signup_ip TEXT,
+              trial_granted INTEGER NOT NULL DEFAULT 0,
+              granted_at TEXT,
+              updated_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS local_credentials (
+              user_id TEXT PRIMARY KEY,
+              password_salt TEXT NOT NULL,
+              password_hash TEXT NOT NULL,
+              algo TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+              token_hash TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              expires_at TEXT NOT NULL,
+              status TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              used_at TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS signup_audit (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              email TEXT NOT NULL,
+              phone_e164 TEXT NOT NULL,
+              accepted_terms INTEGER NOT NULL,
+              terms_version TEXT NOT NULL,
+              accepted_at TEXT NOT NULL,
+              signup_ip TEXT,
+              user_agent TEXT,
+              created_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS pending_signup_tokens (
+              token_hash TEXT PRIMARY KEY,
+              email TEXT NOT NULL,
+              full_name TEXT NOT NULL,
+              phone_e164 TEXT NOT NULL,
+              password_salt TEXT NOT NULL,
+              password_hash TEXT NOT NULL,
+              terms_version TEXT NOT NULL,
+              accepted_at TEXT NOT NULL,
+              signup_ip TEXT,
+              user_agent TEXT,
+              expires_at TEXT NOT NULL,
+              status TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              used_at TEXT
+            )
+        """)
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_e164)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_signup_ip_unique ON users(signup_ip)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_entitlements_phone_hash_unique ON user_entitlements(phone_hash)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_entitlements_trial ON user_entitlements(trial_granted, updated_at DESC)")
+    conn.commit()
+    _PG_SCHEMA_READY = True
 
 
 def _db_path() -> str:
@@ -580,8 +696,41 @@ def upsert_user_entitlement(
     signup_ip: Optional[str],
     trial_granted: bool,
 ) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO user_entitlements(
+                      user_id, phone_e164, phone_hash, device_fingerprint, signup_ip, trial_granted, granted_at, updated_at
+                    )
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                      phone_e164=excluded.phone_e164,
+                      phone_hash=excluded.phone_hash,
+                      device_fingerprint=excluded.device_fingerprint,
+                      signup_ip=excluded.signup_ip,
+                      trial_granted=excluded.trial_granted,
+                      granted_at=CASE WHEN user_entitlements.granted_at IS NULL THEN excluded.granted_at ELSE user_entitlements.granted_at END,
+                      updated_at=excluded.updated_at
+                    """,
+                    (
+                        user_id,
+                        phone_e164,
+                        phone_hash,
+                        device_fingerprint,
+                        signup_ip,
+                        1 if trial_granted else 0,
+                        now if trial_granted else None,
+                        now,
+                    ),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -611,15 +760,21 @@ def upsert_user_entitlement(
         )
         conn.commit()
 
-
 def has_trial_claim_for_phone_hash(phone_hash: str) -> bool:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM user_entitlements WHERE phone_hash=%s AND trial_granted=1 LIMIT 1",
+                (phone_hash,),
+            )
+            return cur.fetchone() is not None
     conn = _ensure_conn()
     cur = conn.execute(
         "SELECT 1 FROM user_entitlements WHERE phone_hash=? AND trial_granted=1 LIMIT 1",
         (phone_hash,),
     )
     return cur.fetchone() is not None
-
 
 def upsert_user_profile(
     user_id: str,
@@ -629,7 +784,6 @@ def upsert_user_profile(
     full_name: Optional[str],
     signup_ip: Optional[str],
 ) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
     e = (email or "").strip()
     p = (phone_e164 or "").strip()
@@ -640,6 +794,28 @@ def upsert_user_profile(
         raise ValueError("phone_required")
     if not n:
         raise ValueError("full_name_required")
+
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users(user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                      email=excluded.email,
+                      phone_e164=excluded.phone_e164,
+                      full_name=excluded.full_name,
+                      signup_ip=COALESCE(excluded.signup_ip, users.signup_ip),
+                      updated_at=excluded.updated_at
+                    """,
+                    (user_id, e, p, n, signup_ip, now, now),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -656,12 +832,15 @@ def upsert_user_profile(
         )
         conn.commit()
 
-
 def ip_already_registered(signup_ip: str) -> bool:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM users WHERE signup_ip=%s LIMIT 1", (signup_ip,))
+            return cur.fetchone() is not None
     conn = _ensure_conn()
     cur = conn.execute("SELECT 1 FROM users WHERE signup_ip=? LIMIT 1", (signup_ip,))
     return cur.fetchone() is not None
-
 
 def upsert_xero_connection(
     user_id: str,
@@ -773,8 +952,27 @@ def get_oauth_identity(*, provider: str, provider_subject_id: str) -> Optional[d
 
 
 def upsert_local_credential(user_id: str, *, password_salt: str, password_hash: str, algo: str = "pbkdf2_sha256") -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO local_credentials(user_id, password_salt, password_hash, algo, created_at, updated_at)
+                    VALUES(%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                      password_salt=excluded.password_salt,
+                      password_hash=excluded.password_hash,
+                      algo=excluded.algo,
+                      updated_at=excluded.updated_at
+                    """,
+                    (user_id, password_salt, password_hash, algo, now, now),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -790,8 +988,21 @@ def upsert_local_credential(user_id: str, *, password_salt: str, password_hash: 
         )
         conn.commit()
 
-
 def get_local_credential(user_id: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT user_id, password_salt, password_hash, algo, created_at, updated_at
+                FROM local_credentials
+                WHERE user_id=%s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -805,8 +1016,21 @@ def get_local_credential(user_id: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
-
 def get_user_by_phone(phone_e164: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+                FROM users
+                WHERE phone_e164=%s
+                LIMIT 1
+                """,
+                (str(phone_e164 or "").strip(),),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -820,8 +1044,21 @@ def get_user_by_phone(phone_e164: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
-
 def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+                FROM users
+                WHERE email=%s
+                LIMIT 1
+                """,
+                (str(email or "").strip(),),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -835,8 +1072,21 @@ def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
-
 def get_user_by_id(user_id: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+                FROM users
+                WHERE user_id=%s
+                LIMIT 1
+                """,
+                (str(user_id or "").strip(),),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -850,10 +1100,22 @@ def get_user_by_id(user_id: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
-
 def create_password_reset_token(*, token_hash: str, user_id: str, expires_at: str) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO password_reset_tokens(token_hash, user_id, expires_at, status, created_at, used_at)
+                    VALUES(%s,%s,%s,%s,%s,NULL)
+                    """,
+                    (token_hash, user_id, expires_at, "pending", now),
+                )
+            conn.commit()
+        return
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -864,8 +1126,21 @@ def create_password_reset_token(*, token_hash: str, user_id: str, expires_at: st
         )
         conn.commit()
 
-
 def get_password_reset_token(token_hash: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT token_hash, user_id, expires_at, status, created_at, used_at
+                FROM password_reset_tokens
+                WHERE token_hash=%s
+                LIMIT 1
+                """,
+                (token_hash,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -879,10 +1154,23 @@ def get_password_reset_token(token_hash: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
-
 def mark_password_reset_token_used(token_hash: str) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE password_reset_tokens
+                    SET status='used', used_at=%s
+                    WHERE token_hash=%s
+                    """,
+                    (now, token_hash),
+                )
+            conn.commit()
+        return
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -893,7 +1181,6 @@ def mark_password_reset_token_used(token_hash: str) -> None:
             (now, token_hash),
         )
         conn.commit()
-
 
 def append_signup_audit(
     *,
@@ -906,6 +1193,30 @@ def append_signup_audit(
     signup_ip: Optional[str],
     user_agent: Optional[str],
 ) -> None:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO signup_audit(id, user_id, email, phone_e164, accepted_terms, terms_version, accepted_at, signup_ip, user_agent, created_at)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        user_id,
+                        email,
+                        phone_e164,
+                        1 if accepted_terms else 0,
+                        terms_version,
+                        accepted_at,
+                        signup_ip,
+                        user_agent,
+                        _now_iso(),
+                    ),
+                )
+            conn.commit()
+        return
     conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
@@ -928,7 +1239,6 @@ def append_signup_audit(
         )
         conn.commit()
 
-
 def create_pending_signup_token(
     *,
     token_hash: str,
@@ -943,8 +1253,39 @@ def create_pending_signup_token(
     user_agent: Optional[str],
     expires_at: str,
 ) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO pending_signup_tokens(
+                      token_hash, email, full_name, phone_e164, password_salt, password_hash,
+                      terms_version, accepted_at, signup_ip, user_agent, expires_at, status, created_at, used_at
+                    )
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL)
+                    """,
+                    (
+                        token_hash,
+                        email,
+                        full_name,
+                        phone_e164,
+                        password_salt,
+                        password_hash,
+                        terms_version,
+                        accepted_at,
+                        signup_ip,
+                        user_agent,
+                        expires_at,
+                        "pending",
+                        now,
+                    ),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -972,8 +1313,22 @@ def create_pending_signup_token(
         )
         conn.commit()
 
-
 def get_pending_signup_token(token_hash: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT token_hash, email, full_name, phone_e164, password_salt, password_hash,
+                       terms_version, accepted_at, signup_ip, user_agent, expires_at, status, created_at, used_at
+                FROM pending_signup_tokens
+                WHERE token_hash=%s
+                LIMIT 1
+                """,
+                (token_hash,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -988,8 +1343,23 @@ def get_pending_signup_token(token_hash: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
-
 def get_latest_pending_signup_by_email(email: str, *, status: str = "pending") -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT token_hash, email, full_name, phone_e164, password_salt, password_hash,
+                       terms_version, accepted_at, signup_ip, user_agent, expires_at, status, created_at, used_at
+                FROM pending_signup_tokens
+                WHERE email=%s AND status=%s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (email, status),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -1004,7 +1374,6 @@ def get_latest_pending_signup_by_email(email: str, *, status: str = "pending") -
     )
     row = cur.fetchone()
     return dict(row) if row else None
-
 
 def mark_pending_signup_token_email_verified(token_hash: str) -> None:
     conn = _ensure_conn()
@@ -1021,8 +1390,22 @@ def mark_pending_signup_token_email_verified(token_hash: str) -> None:
 
 
 def mark_pending_signup_token_used(token_hash: str) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE pending_signup_tokens
+                    SET status='used', used_at=%s
+                    WHERE token_hash=%s
+                    """,
+                    (now, token_hash),
+                )
+            conn.commit()
+        return
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -1033,7 +1416,6 @@ def mark_pending_signup_token_used(token_hash: str) -> None:
             (now, token_hash),
         )
         conn.commit()
-
 
 def reset_all_jobs_for_tests() -> None:
     conn = _ensure_conn()
