@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LedgerSnaps Pricing</title>
+  <link rel="icon" type="image/png" href="/assets/images/logo-transparent.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Monda:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Monda','Sora',sans-serif;
+      color: #f8fafc;
+      background: #0b1526 url('/assets/images/landing-bg-dark-laser-fast.jpg') center/cover no-repeat fixed;
+    }
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 24px 28px;
+      min-height: calc(100vh - 68px);
+      display: flex;
+      flex-direction: column;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+    }
+    .brand img { height: 48px; width: auto; }
+    .hero { text-align: center; margin-top: 36px; }
+    .hero h1 { margin: 0; font-size: 44px; font-weight: 600; }
+    .hero p { margin: 14px 0 0; color: rgba(248,250,252,.86); }
+    .toggle {
+      margin: 28px auto 0;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 999px;
+      padding: 4px;
+      width: fit-content;
+      display: flex;
+      gap: 4px;
+    }
+    .toggle button {
+      border: 0;
+      background: transparent;
+      color: rgba(248,250,252,.82);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-family: inherit;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .toggle button.active {
+      background: #ffffff;
+      color: #111827;
+      font-weight: 600;
+    }
+    .grid {
+      margin-top: 30px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 16px;
+    }
+    .card {
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(10,18,38,.62);
+      backdrop-filter: blur(6px);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 360px;
+    }
+    .card.featured {
+      border-color: #E32652;
+      box-shadow: 0 0 0 1px rgba(227,38,82,.24) inset;
+    }
+    .name { font-size: 18px; font-weight: 600; margin: 0; }
+    .desc { margin: 8px 0 0; color: rgba(248,250,252,.72); font-size: 13px; min-height: 36px; }
+    .price {
+      margin-top: 16px;
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .price small { font-size: 13px; font-weight: 500; color: rgba(248,250,252,.72); margin-left: 6px; }
+    .features { margin: 16px 0 0; padding: 0; list-style: none; color: rgba(248,250,252,.88); font-size: 13px; }
+    .features li { margin-bottom: 10px; }
+    .cta {
+      margin-top: auto;
+      border: 1px solid rgba(255,255,255,.35);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      background: transparent;
+    }
+    .featured .cta {
+      border-color: #E32652;
+      background: #E32652;
+    }
+    .footer-wrap { margin-top: 28px; }
+    @media (max-width: 1100px){ .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 700px){
+      .hero h1 { font-size: 34px; }
+      .grid { grid-template-columns: 1fr; }
+      .brand img { height: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="brand">
+      <img src="/assets/images/logo-with-text-white.png" alt="LedgerSnaps" />
+    </header>
+
+    <section class="hero">
+      <h1>Pricing</h1>
+      <p>Simple plans for firms and teams processing invoices at scale.</p>
+      <div class="toggle">
+        <button id="btn-monthly" class="active" type="button">monthly</button>
+        <button id="btn-yearly" type="button">yearly · save 20%</button>
+      </div>
+    </section>
+
+    <section class="grid" id="pricing-grid">
+      <article class="card">
+        <h3 class="name">Starter</h3>
+        <p class="desc">For solo operators getting started.</p>
+        <div class="price" data-monthly="$19" data-yearly="$15">$19<small>/mo</small></div>
+        <ul class="features">
+          <li>Up to 200 invoices / month</li>
+          <li>Email code authentication</li>
+          <li>Basic extraction workflow</li>
+        </ul>
+        <a class="cta" href="#">Start trial</a>
+      </article>
+
+      <article class="card featured">
+        <h3 class="name">Growth</h3>
+        <p class="desc">For busy bookkeeping teams.</p>
+        <div class="price" data-monthly="$79" data-yearly="$63">$79<small>/mo</small></div>
+        <ul class="features">
+          <li>Up to 2,000 invoices / month</li>
+          <li>Priority queue processing</li>
+          <li>Xero & MYOB ready</li>
+        </ul>
+        <a class="cta" href="#">Choose Growth</a>
+      </article>
+
+      <article class="card">
+        <h3 class="name">Scale</h3>
+        <p class="desc">For multi-client accounting operations.</p>
+        <div class="price" data-monthly="$199" data-yearly="$159">$199<small>/mo</small></div>
+        <ul class="features">
+          <li>Up to 8,000 invoices / month</li>
+          <li>Advanced validation controls</li>
+          <li>Team roles & audit trails</li>
+        </ul>
+        <a class="cta" href="#">Choose Scale</a>
+      </article>
+
+      <article class="card">
+        <h3 class="name">Enterprise</h3>
+        <p class="desc">For custom security and volume needs.</p>
+        <div class="price" data-monthly="Custom" data-yearly="Custom">Custom<small></small></div>
+        <ul class="features">
+          <li>Custom quotas & SLAs</li>
+          <li>Dedicated onboarding</li>
+          <li>Compliance support</li>
+        </ul>
+        <a class="cta" href="#">Contact sales</a>
+      </article>
+    </section>
+
+    <div class="footer-wrap">
+      {{FOOTER_SHARED}}
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const monthlyBtn = document.getElementById('btn-monthly');
+      const yearlyBtn = document.getElementById('btn-yearly');
+      const prices = Array.from(document.querySelectorAll('.price'));
+      const setMode = (mode) => {
+        const monthly = mode === 'monthly';
+        monthlyBtn.classList.toggle('active', monthly);
+        yearlyBtn.classList.toggle('active', !monthly);
+        prices.forEach((el) => {
+          const value = monthly ? el.getAttribute('data-monthly') : el.getAttribute('data-yearly');
+          const small = el.querySelector('small');
+          if (small) {
+            if (value === 'Custom') {
+              el.firstChild.textContent = 'Custom';
+              small.textContent = '';
+            } else {
+              el.firstChild.textContent = value;
+              small.textContent = '/mo';
+            }
+          }
+        });
+      };
+      monthlyBtn?.addEventListener('click', () => setMode('monthly'));
+      yearlyBtn?.addEventListener('click', () => setMode('yearly'));
+
+      const currentPath = window.location.pathname || '/';
+      document.querySelectorAll('[data-open-legal]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          const kind = btn.getAttribute('data-open-legal');
+          if (!kind) return;
+          e.preventDefault();
+          window.location.href = kind === 'privacy' ? '/privacy' : '/terms';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

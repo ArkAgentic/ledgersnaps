@@ -446,6 +446,14 @@ async def landing_privacy_page() -> HTMLResponse:
     return response
 
 
+@app.get("/pricing", response_class=HTMLResponse)
+async def pricing_page() -> HTMLResponse:
+    response = _render_template_or_500("pricing.html", "pricing_template_missing")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
 @app.get("/playground", response_class=HTMLResponse)
 async def playground() -> HTMLResponse:
     html = """
