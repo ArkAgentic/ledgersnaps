@@ -134,7 +134,7 @@
       </div>
 
       <div id="left-legal-panel" class="hidden flex-1 pt-10 md:pt-14 text-white overflow-y-auto">
-        <div class="max-w-4xl w-full mx-auto text-center">
+        <div id="left-legal-shell" class="max-w-4xl w-full mx-auto text-center">
           <h2 id="left-legal-title" class="text-2xl md:text-3xl font-semibold leading-tight mb-6">Terms & Conditions</h2>
           <div id="left-legal-content" class="space-y-6 text-xs md:text-sm leading-7 text-white/95 text-left"></div>
           <button type="button" id="left-legal-back" class="inline-block mt-14 text-sm text-neutral-200 hover:text-white underline">Back to home</button>
@@ -463,6 +463,7 @@
       const leftLegalTitle = document.getElementById('left-legal-title');
       const leftLegalContent = document.getElementById('left-legal-content');
       const leftLegalBack = document.getElementById('left-legal-back');
+      const leftLegalShell = document.getElementById('left-legal-shell');
 
       const PANELS = [signinCombined, resetPanel, createAccountPanel, verifyCodePanel, phoneVerifyPanel].filter(Boolean);
       PANELS.forEach((el) => el.classList.add('auth-panel'));
@@ -555,6 +556,10 @@
       function showLeftLegal(kind, updateHistory = true) {
         if (!leftMainContent || !leftLegalPanel || !leftLegalTitle || !leftLegalContent) return;
         const legalKind = kind === 'privacy' ? 'privacy' : (kind === 'pricing' ? 'pricing' : 'terms');
+        if (leftLegalShell) {
+          leftLegalShell.classList.remove('max-w-4xl', 'max-w-6xl');
+          leftLegalShell.classList.add(legalKind === 'pricing' ? 'max-w-6xl' : 'max-w-4xl');
+        }
         currentLegalKind = legalKind;
         const lang = normalizeLang(localStorage.getItem('ledgersnaps_lang') || document.documentElement.lang || 'en');
         const isZh = lang === 'zh';
@@ -563,8 +568,24 @@
           zh: `<div class=\"space-y-5\">\n<section><h3 class=\"text-lg font-semibold mb-2\">1. 适用范围与接受</h3><p>本服务条款适用于你对 LedgerSnaps 网站、API 及相关服务的访问与使用。使用本服务即表示你同意本条款与隐私政策。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">2. 账户资格与安全</h3><p>你需提供真实、准确的注册信息并妥善保管账户凭据。你账户下（含授权团队成员）的所有操作由你负责。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">3. 客户数据与授权</h3><p>你对上传文档与提取结果保有权利。你声明并保证：你已取得提交和处理该等数据所需的全部权利与授权（含客户或第三方数据）。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">4. 合法使用与限制</h3><p>你不得将本服务用于违法、欺诈、滥用或危害安全的行为，包括未授权访问、传播恶意软件、垃圾信息、超出允许接口的数据抓取、侵犯第三方权利等。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">5. AI 提取与结果准确性</h3><p>LedgerSnaps 提供自动化提取与流程辅助。提取结果可能存在误差，需人工复核。你仍需对会计判断、申报及后续使用承担责任。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">6. 第三方集成</h3><p>当你连接第三方平台（包括会计系统）时，即授权 LedgerSnaps 代表你与该平台进行必要的数据访问与交换。你对第三方平台的使用同时受其条款与政策约束。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">7. 计费、套餐与额度</h3><p>付费计划、试用额度及充值额度以购买时展示的价格与规则为准。除法律另有规定外，费用不予退还。逾期未支付时我们可暂停服务。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">8. 可用性与服务变更</h3><p>我们可能持续更新功能、限额与接口。我们将尽力提供稳定服务，但在云基础设施或第三方依赖场景下，不保证绝对不中断。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">9. 暂停与终止</h3><p>若账户严重违反本条款、引发法律风险或危及平台安全，我们可暂停或终止服务。你也可随时停止使用。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">10. 责任限制</h3><p>在法律允许范围内，LedgerSnaps 不对间接、附带、特殊、后果性或惩罚性损失承担责任，亦不对利润、数据、商誉或业务中断损失承担责任。</p></section>\n<section><h3 class=\"text-lg font-semibold mb-2\">11. 联系方式</h3><p>条款相关问题请联系：<a class=\"underline\" href=\"mailto:support@ledgersnaps.com\">support@ledgersnaps.com</a></p></section>\n</div>`,
         };
         const PRICING_HTML = {
-          en: `<div class=\"space-y-6\">\n<section class=\"text-center\"><p class=\"text-white/80 text-sm md:text-base\">Simple plans for firms and teams processing invoices at scale.</p></section>\n<section class=\"grid grid-cols-1 md:grid-cols-2 gap-4 text-left\">\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Starter</h3><p class=\"text-2xl font-bold mt-2\">$19<span class=\"text-sm font-medium text-white/70 ml-1\">/mo</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Up to 200 invoices / month</li><li>Email code authentication</li><li>Basic extraction workflow</li></ul></article>\n<article class=\"rounded-2xl border border-[#E32652] bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Growth</h3><p class=\"text-2xl font-bold mt-2\">$79<span class=\"text-sm font-medium text-white/70 ml-1\">/mo</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Up to 2,000 invoices / month</li><li>Priority queue processing</li><li>Xero & MYOB ready</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Scale</h3><p class=\"text-2xl font-bold mt-2\">$199<span class=\"text-sm font-medium text-white/70 ml-1\">/mo</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Up to 8,000 invoices / month</li><li>Advanced validation controls</li><li>Team roles & audit trails</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Enterprise</h3><p class=\"text-2xl font-bold mt-2\">Custom</p><ul class=\"mt-3 space-y-1 text-white/85\"><li>Custom quotas & SLAs</li><li>Dedicated onboarding</li><li>Compliance support</li></ul></article>\n</section>\n</div>`,
-          zh: `<div class=\"space-y-6\">\n<section class=\"text-center\"><p class=\"text-white/80 text-sm md:text-base\">先提供四档方案框架，后续我们再逐项细调价格与文案。</p></section>\n<section class=\"grid grid-cols-1 md:grid-cols-2 gap-4 text-left\">\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Starter</h3><p class=\"text-2xl font-bold mt-2\">$19<span class=\"text-sm font-medium text-white/70 ml-1\">/月</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>每月最多 200 张发票</li><li>邮箱验证码登录</li><li>基础提取流程</li></ul></article>\n<article class=\"rounded-2xl border border-[#E32652] bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Growth</h3><p class=\"text-2xl font-bold mt-2\">$79<span class=\"text-sm font-medium text-white/70 ml-1\">/月</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>每月最多 2,000 张发票</li><li>优先队列处理</li><li>支持 Xero 与 MYOB</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Scale</h3><p class=\"text-2xl font-bold mt-2\">$199<span class=\"text-sm font-medium text-white/70 ml-1\">/月</span></p><ul class=\"mt-3 space-y-1 text-white/85\"><li>每月最多 8,000 张发票</li><li>高级校验控制</li><li>团队角色与审计轨迹</li></ul></article>\n<article class=\"rounded-2xl border border-white/20 bg-white/5 p-4\"><h3 class=\"text-base font-semibold\">Enterprise</h3><p class=\"text-2xl font-bold mt-2\">定制</p><ul class=\"mt-3 space-y-1 text-white/85\"><li>自定义配额与 SLA</li><li>专属上手支持</li><li>合规支持</li></ul></article>\n</section>\n</div>`,
+          en: `<div class="space-y-6">
+<section class="text-center"><p class="text-white/80 text-sm md:text-base">Billing options include monthly and yearly (save 20%).</p></section>
+<section class="grid grid-cols-1 gap-4 text-left">
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Trial</h3><p class="text-2xl font-bold mt-2">¥0<span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><p class="text-sm text-white/70 mt-1">Yearly equivalent: ¥0/mo (save 20%)</p><ul class="mt-3 space-y-1 text-white/85"><li>7-day free trial</li><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 10 invoices</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Basic</h3><p class="text-2xl font-bold mt-2">¥12.95<span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><p class="text-sm text-white/70 mt-1">Yearly: ¥10.36/mo (save 20%)</p><ul class="mt-3 space-y-1 text-white/85"><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 100 invoices / month</li><li>Xero & MYOB support included</li></ul></article>
+<article class="rounded-2xl border border-[#E32652] bg-white/5 p-5"><h3 class="text-base font-semibold">Advanced</h3><p class="text-2xl font-bold mt-2">¥10.95<span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><p class="text-sm text-white/70 mt-1">Yearly: ¥8.76/mo (save 20%)</p><ul class="mt-3 space-y-1 text-white/85"><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 250 invoices / month</li><li>Xero & MYOB support included</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Top-up</h3><p class="text-2xl font-bold mt-2">¥5.95<span class="text-sm font-medium text-white/70 ml-1"> one-time</span></p><p class="text-sm text-white/70 mt-1">Adds 50 AI-heavy extraction invoices</p><ul class="mt-3 space-y-1 text-white/85"><li>One-time purchase (not monthly)</li><li>Use when monthly AI quota is depleted</li><li>Can be purchased repeatedly as needed</li></ul></article>
+</section>
+</div>`,
+          zh: `<div class="space-y-6">
+<section class="text-center"><p class="text-white/80 text-sm md:text-base">支持月付与包年（包年立减 20%）。</p></section>
+<section class="grid grid-cols-1 gap-4 text-left">
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">试用版</h3><p class="text-2xl font-bold mt-2">¥0<span class="text-sm font-medium text-white/70 ml-1">/月</span></p><p class="text-sm text-white/70 mt-1">包年折算：¥0/月（减 20%）</p><ul class="mt-3 space-y-1 text-white/85"><li>7 天免费试用</li><li>发票提取不限量</li><li>需要 AI 重提取的额度：10 张发票</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">基础版</h3><p class="text-2xl font-bold mt-2">¥12.95<span class="text-sm font-medium text-white/70 ml-1">/月</span></p><p class="text-sm text-white/70 mt-1">包年折算：¥10.36/月（减 20%）</p><ul class="mt-3 space-y-1 text-white/85"><li>发票提取不限量</li><li>需要 AI 重提取的额度：每月 100 张</li><li>包含 Xero 与 MYOB 支持</li></ul></article>
+<article class="rounded-2xl border border-[#E32652] bg-white/5 p-5"><h3 class="text-base font-semibold">高级版</h3><p class="text-2xl font-bold mt-2">¥10.95<span class="text-sm font-medium text-white/70 ml-1">/月</span></p><p class="text-sm text-white/70 mt-1">包年折算：¥8.76/月（减 20%）</p><ul class="mt-3 space-y-1 text-white/85"><li>发票提取不限量</li><li>需要 AI 重提取的额度：每月 250 张</li><li>包含 Xero 与 MYOB 支持</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">充值包</h3><p class="text-2xl font-bold mt-2">¥5.95<span class="text-sm font-medium text-white/70 ml-1"> 一次性</span></p><p class="text-sm text-white/70 mt-1">可增加 50 张 AI 重提取额度</p><ul class="mt-3 space-y-1 text-white/85"><li>一次性购买（非月费）</li><li>月度 AI 额度用完后可补充</li><li>可按需重复购买</li></ul></article>
+</section>
+</div>`,
         };
 
         const PRIVACY_HTML = {
