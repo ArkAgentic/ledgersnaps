@@ -988,6 +988,15 @@ async def auth_signup(
     if get_user_by_phone(phone_e164):
         raise HTTPException(status_code=409, detail="phone_already_registered")
 
+    pending_same_email = get_latest_pending_signup_by_email(email_norm, status="pending")
+    if pending_same_email:
+        exp = str(pending_same_email.get("expires_at") or "")
+        try:
+            if exp and datetime.utcnow() <= datetime.fromisoformat(exp):
+                raise HTTPException(status_code=409, detail="email_verification_pending")
+        except ValueError:
+            pass
+
     signup_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
     accepted_at = datetime.utcnow().isoformat()
@@ -1157,6 +1166,7 @@ async def auth_signup_verify_code(
 
     existing_user = get_user_by_email(email_norm) or get_user_by_phone(phone_e164)
     if existing_user:
+        mark_pending_signup_token_used(token_hash)
         token_out = issue_dev_token(user_id=str(existing_user.get("user_id")), tenant_id="default")
         return {
             "status": "signed_in",
