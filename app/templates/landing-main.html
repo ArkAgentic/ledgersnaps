@@ -570,22 +570,32 @@
         const PRICING_HTML = {
           en: `<div class="space-y-6">
 <section class="text-center"><p class="text-white/80 text-sm md:text-base">Billing options include monthly and yearly (save 20%).</p></section>
-<section class="grid grid-cols-1 gap-4 text-left">
-<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Trial</h3><p class="text-2xl font-bold mt-2">$0<span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><p class="text-sm text-white/70 mt-1">Yearly equivalent: $0/mo (save 20%)</p><ul class="mt-3 space-y-1 text-white/85"><li>7-day free trial</li><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 10 invoices</li></ul></article>
-<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Basic</h3><p class="text-2xl font-bold mt-2">$12.95<span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><p class="text-sm text-white/70 mt-1">Yearly: $10.36/mo (save 20%)</p><ul class="mt-3 space-y-1 text-white/85"><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 100 invoices / month</li><li>Xero & MYOB support included</li></ul></article>
-<article class="rounded-2xl border border-[#E32652] bg-white/5 p-5"><h3 class="text-base font-semibold">Advanced</h3><p class="text-2xl font-bold mt-2">$25.95<span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><p class="text-sm text-white/70 mt-1">Yearly: $20.76/mo (save 20%)</p><ul class="mt-3 space-y-1 text-white/85"><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 250 invoices / month</li><li>Xero & MYOB support included</li></ul></article>
-<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Top-up</h3><p class="text-2xl font-bold mt-2">$5.95<span class="text-sm font-medium text-white/70 ml-1"> one-time</span></p><p class="text-sm text-white/70 mt-1">Adds 50 AI-heavy extraction invoices</p><ul class="mt-3 space-y-1 text-white/85"><li>One-time purchase (not monthly)</li><li>Use when monthly AI quota is depleted</li><li>Can be purchased repeatedly as needed
-<li>* Basic plan required before Top-up purchase</li></li></ul></article>
+<section class="flex justify-center">
+  <div class="inline-flex items-center rounded-full border border-white/25 bg-white/10 p-1 gap-1" id="pricing-billing-toggle" role="tablist" aria-label="Billing mode">
+    <button type="button" id="pricing-monthly-btn" class="px-4 py-1.5 rounded-full text-xs md:text-sm bg-white text-neutral-900 font-semibold" data-billing="monthly">Monthly</button>
+    <button type="button" id="pricing-yearly-btn" class="px-4 py-1.5 rounded-full text-xs md:text-sm text-white/90" data-billing="yearly">Yearly · Save 20%</button>
+  </div>
+</section>
+<section class="grid grid-cols-1 gap-4 text-left" id="pricing-cards-grid">
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Trial</h3><p class="text-2xl font-bold mt-2"><span data-price-monthly="$0" data-price-yearly="$0">$0</span><span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><ul class="mt-3 space-y-1 text-white/85"><li>7-day free trial</li><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 10 invoices</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Basic</h3><p class="text-2xl font-bold mt-2"><span data-price-monthly="$12.95" data-price-yearly="$10.36">$12.95</span><span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><ul class="mt-3 space-y-1 text-white/85"><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 100 invoices / month</li><li>Xero & MYOB support included</li></ul></article>
+<article class="rounded-2xl border border-[#E32652] bg-white/5 p-5"><h3 class="text-base font-semibold">Advanced</h3><p class="text-2xl font-bold mt-2"><span data-price-monthly="$25.95" data-price-yearly="$20.76">$25.95</span><span class="text-sm font-medium text-white/70 ml-1">/mo</span></p><ul class="mt-3 space-y-1 text-white/85"><li>Unlimited invoice extraction</li><li>AI-heavy extraction quota: 250 invoices / month</li><li>Xero & MYOB support included</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">Top-up</h3><p class="text-2xl font-bold mt-2">$5.95<span class="text-sm font-medium text-white/70 ml-1"> one-time</span></p><p class="text-sm text-white/70 mt-1">Adds 50 AI-heavy extraction invoices</p><ul class="mt-3 space-y-1 text-white/85"><li>One-time purchase (not monthly)</li><li>Use when monthly AI quota is depleted</li><li>Can be purchased repeatedly as needed</li><li>* Basic plan required before Top-up purchase</li></ul></article>
 </section>
 </div>`,
           zh: `<div class="space-y-6">
 <section class="text-center"><p class="text-white/80 text-sm md:text-base">支持月付与包年（包年立减 20%）。</p></section>
-<section class="grid grid-cols-1 gap-4 text-left">
-<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">试用版</h3><p class="text-2xl font-bold mt-2">$0<span class="text-sm font-medium text-white/70 ml-1">/月</span></p><p class="text-sm text-white/70 mt-1">包年折算：$0/月（减 20%）</p><ul class="mt-3 space-y-1 text-white/85"><li>7 天免费试用</li><li>发票提取不限量</li><li>需要 AI 重提取的额度：10 张发票</li></ul></article>
-<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">基础版</h3><p class="text-2xl font-bold mt-2">$12.95<span class="text-sm font-medium text-white/70 ml-1">/月</span></p><p class="text-sm text-white/70 mt-1">包年折算：$10.36/月（减 20%）</p><ul class="mt-3 space-y-1 text-white/85"><li>发票提取不限量</li><li>需要 AI 重提取的额度：每月 100 张</li><li>包含 Xero 与 MYOB 支持</li></ul></article>
-<article class="rounded-2xl border border-[#E32652] bg-white/5 p-5"><h3 class="text-base font-semibold">高级版</h3><p class="text-2xl font-bold mt-2">$25.95<span class="text-sm font-medium text-white/70 ml-1">/月</span></p><p class="text-sm text-white/70 mt-1">包年折算：$20.76/月（减 20%）</p><ul class="mt-3 space-y-1 text-white/85"><li>发票提取不限量</li><li>需要 AI 重提取的额度：每月 250 张</li><li>包含 Xero 与 MYOB 支持</li></ul></article>
-<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">充值包</h3><p class="text-2xl font-bold mt-2">$5.95<span class="text-sm font-medium text-white/70 ml-1"> 一次性</span></p><p class="text-sm text-white/70 mt-1">可增加 50 张 AI 重提取额度</p><ul class="mt-3 space-y-1 text-white/85"><li>一次性购买（非月费）</li><li>月度 AI 额度用完后可补充</li><li>可按需重复购买
-<li>* 需先开通基础版后才可购买充值包</li></li></ul></article>
+<section class="flex justify-center">
+  <div class="inline-flex items-center rounded-full border border-white/25 bg-white/10 p-1 gap-1" id="pricing-billing-toggle" role="tablist" aria-label="计费方式">
+    <button type="button" id="pricing-monthly-btn" class="px-4 py-1.5 rounded-full text-xs md:text-sm bg-white text-neutral-900 font-semibold" data-billing="monthly">月付</button>
+    <button type="button" id="pricing-yearly-btn" class="px-4 py-1.5 rounded-full text-xs md:text-sm text-white/90" data-billing="yearly">年付 · 省 20%</button>
+  </div>
+</section>
+<section class="grid grid-cols-1 gap-4 text-left" id="pricing-cards-grid">
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">试用版</h3><p class="text-2xl font-bold mt-2"><span data-price-monthly="$0" data-price-yearly="$0">$0</span><span class="text-sm font-medium text-white/70 ml-1">/月</span></p><ul class="mt-3 space-y-1 text-white/85"><li>7 天免费试用</li><li>发票提取不限量</li><li>需要 AI 重提取的额度：10 张发票</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">基础版</h3><p class="text-2xl font-bold mt-2"><span data-price-monthly="$12.95" data-price-yearly="$10.36">$12.95</span><span class="text-sm font-medium text-white/70 ml-1">/月</span></p><ul class="mt-3 space-y-1 text-white/85"><li>发票提取不限量</li><li>需要 AI 重提取的额度：每月 100 张</li><li>包含 Xero 与 MYOB 支持</li></ul></article>
+<article class="rounded-2xl border border-[#E32652] bg-white/5 p-5"><h3 class="text-base font-semibold">高级版</h3><p class="text-2xl font-bold mt-2"><span data-price-monthly="$25.95" data-price-yearly="$20.76">$25.95</span><span class="text-sm font-medium text-white/70 ml-1">/月</span></p><ul class="mt-3 space-y-1 text-white/85"><li>发票提取不限量</li><li>需要 AI 重提取的额度：每月 250 张</li><li>包含 Xero 与 MYOB 支持</li></ul></article>
+<article class="rounded-2xl border border-white/20 bg-white/5 p-5"><h3 class="text-base font-semibold">充值包</h3><p class="text-2xl font-bold mt-2">$5.95<span class="text-sm font-medium text-white/70 ml-1"> 一次性</span></p><p class="text-sm text-white/70 mt-1">可增加 50 张 AI 重提取额度</p><ul class="mt-3 space-y-1 text-white/85"><li>一次性购买（非月费）</li><li>月度 AI 额度用完后可补充</li><li>可按需重复购买</li><li>* 需先开通基础版后才可购买充值包</li></ul></article>
 </section>
 </div>`,
         };
@@ -603,6 +613,33 @@
         } else if (legalKind === 'pricing') {
           leftLegalTitle.textContent = dict.pricing || (isZh ? '价格方案' : 'Pricing');
           leftLegalContent.innerHTML = isZh ? PRICING_HTML.zh : PRICING_HTML.en;
+
+          const monthlyBtn = document.getElementById('pricing-monthly-btn');
+          const yearlyBtn = document.getElementById('pricing-yearly-btn');
+          const priceNodes = Array.from(document.querySelectorAll('[data-price-monthly]'));
+
+          const setBillingMode = (mode) => {
+            const isMonthly = mode !== 'yearly';
+            if (monthlyBtn && yearlyBtn) {
+              monthlyBtn.classList.toggle('bg-white', isMonthly);
+              monthlyBtn.classList.toggle('text-neutral-900', isMonthly);
+              monthlyBtn.classList.toggle('font-semibold', isMonthly);
+              monthlyBtn.classList.toggle('text-white/90', !isMonthly);
+
+              yearlyBtn.classList.toggle('bg-white', !isMonthly);
+              yearlyBtn.classList.toggle('text-neutral-900', !isMonthly);
+              yearlyBtn.classList.toggle('font-semibold', !isMonthly);
+              yearlyBtn.classList.toggle('text-white/90', isMonthly);
+            }
+            priceNodes.forEach((node) => {
+              const val = node.getAttribute(isMonthly ? 'data-price-monthly' : 'data-price-yearly');
+              if (val) node.textContent = val;
+            });
+          };
+
+          if (monthlyBtn) monthlyBtn.addEventListener('click', () => setBillingMode('monthly'));
+          if (yearlyBtn) yearlyBtn.addEventListener('click', () => setBillingMode('yearly'));
+          setBillingMode('monthly');
         } else {
           leftLegalTitle.textContent = dict.terms || (isZh ? '服务条款' : 'Terms & Conditions');
           leftLegalContent.innerHTML = isZh ? TERMS_HTML.zh : TERMS_HTML.en;
