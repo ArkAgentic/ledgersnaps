@@ -988,14 +988,6 @@ async def auth_signup(
     if get_user_by_phone(phone_e164):
         raise HTTPException(status_code=409, detail="phone_already_registered")
 
-    pending_same_email = get_latest_pending_signup_by_email(email_norm, status="pending")
-    if pending_same_email:
-        exp = str(pending_same_email.get("expires_at") or "")
-        try:
-            if exp and datetime.utcnow() <= datetime.fromisoformat(exp):
-                raise HTTPException(status_code=409, detail="email_verification_pending")
-        except ValueError:
-            pass
 
     signup_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
