@@ -13,11 +13,11 @@
   <style>
     body { font-family: 'Monda','Sora',sans-serif; }
     .console-bg-light { background:#f6f7fb url('/assets/images/landing-bg-light-fast.jpg') center/cover no-repeat; }
-    .console-bg-dark { background:#0b1526 linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser-fast.jpg') center/cover no-repeat; }
+    .console-bg-dark { background:#0b1526 linear-gradient(rgba(3,9,24,.58), rgba(3,9,24,.66)), url('/assets/images/landing-bg-dark-laser-fast.jpg') center center / cover no-repeat fixed; }
     .sidebar-surface { background: rgba(255,255,255,0.92); backdrop-filter: blur(6px); }
-    .dark .sidebar-surface { background: rgba(30,41,59,0.88); }
+    .dark .sidebar-surface { background-image: linear-gradient(rgba(8,15,35,.62), rgba(8,15,35,.62)), url('/assets/images/landing-bg-dark-laser-fast.jpg'); background-position: left top; background-repeat: no-repeat; background-size: auto; background-color: rgba(8,15,35,.94); }
     #main-pane { background: transparent; }
-    .dark #main-pane { background: linear-gradient(rgba(2,6,23,.35), rgba(2,6,23,.35)); }
+    .dark #main-pane { background: transparent; }
 
   </style>
 </head>
@@ -32,38 +32,38 @@
         </div>
 
         <div class="space-y-1 mb-8" id="menu-primary">
-          <button data-title="Overview" class="menu-option relative flex h-11 w-full items-center rounded-md bg-blue-50 dark:bg-slate-700/70 text-blue-700 dark:text-gray-100 shadow-sm border-l-2 border-blue-500 dark:border-slate-400">
+          <button data-title="Overview" class="menu-option relative flex h-11 w-full items-center rounded-md bg-blue-50 dark:bg-white/16 text-blue-700 dark:text-white shadow-sm border-l-2 border-blue-500 dark:border-white/70">
             <div class="grid h-full w-12 place-content-center"><i data-lucide="layout-dashboard" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Overview</span>
           </button>
-          <button data-title="Upload & Extract" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="upload" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Upload & Extract</span></button>
-          <button data-title="Jobs / History" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="history" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Jobs / History</span></button>
-          <button data-title="Draft Bills (Xero/MYOB)" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="file-check-2" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Draft Bills (Xero/MYOB)</span></button>
-          <button data-title="Exports (Excel)" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="sheet" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Exports (Excel)</span></button>
-          <button data-title="ABN/GST Validation" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="shield-check" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">ABN/GST Validation</span></button>
-          <button data-title="Pricing & Top-up" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="wallet" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Pricing & Top-up</span></button>
+          <button data-title="Upload & Extract" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="upload" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Upload & Extract</span></button>
+          <button data-title="Jobs / History" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="history" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Jobs / History</span></button>
+          <button data-title="Draft Bills (Xero/MYOB)" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="file-check-2" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Draft Bills (Xero/MYOB)</span></button>
+          <button data-title="Exports (Excel)" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="sheet" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Exports (Excel)</span></button>
+          <button data-title="ABN/GST Validation" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="shield-check" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">ABN/GST Validation</span></button>
+          <button data-title="Pricing & Top-up" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="wallet" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Pricing & Top-up</span></button>
         </div>
 
         <div id="account-block" class="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-1">
-          <div id="account-title" class="menu-label px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wide">Account</div>
-          <button data-title="Analytics" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="bar-chart-3" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Analytics</span></button>
-          <button data-title="Settings" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="settings" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Settings</span></button>
-          <button data-title="Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/70"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Support</span></button>
+          <div id="account-title" class="menu-label px-3 py-2 text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wide">Account</div>
+          <button data-title="Analytics" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="bar-chart-3" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Analytics</span></button>
+          <button data-title="Settings" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="settings" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Settings</span></button>
+          <button data-title="Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Support</span></button>
         </div>
 
         <button id="sidebar-toggle" class="absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-800 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800">
           <div class="flex items-center p-3">
             <div class="grid size-10 place-content-center"><span id="sidebar-toggle-icon" class="text-base font-semibold text-gray-600 dark:text-gray-200">«</span></div>
-            <span id="sidebar-toggle-label" class="menu-label text-sm font-medium text-gray-600 dark:text-gray-300">Hide</span>
+            <span id="sidebar-toggle-label" class="menu-label text-sm font-medium text-gray-600 dark:text-white">Hide</span>
           </div>
         </button>
       </nav>
 
       <div id="main-pane" class="flex-1 p-6 overflow-auto text-black dark:text-white">
         <div class="flex justify-end gap-3">
-          <button id="lang-toggle" class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors" title="Switch Language">
+          <button id="lang-toggle" class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors" title="Switch Language">
             <span id="lang-toggle-label" class="text-xs font-semibold leading-none">EN</span>
           </button>
-          <button id="bg-toggle" class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors" title="Toggle Theme">
+          <button id="bg-toggle" class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors" title="Toggle Theme">
             <span id="bg-toggle-icon" class="text-sm font-semibold leading-none">☾</span>
           </button>
         </div>
@@ -181,10 +181,10 @@
       document.querySelectorAll('.menu-option').forEach((btn) => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.menu-option').forEach((other) => {
-            other.classList.remove('bg-blue-50','dark:bg-slate-700/70','text-blue-700','dark:text-gray-100','shadow-sm','border-l-2','border-blue-500','dark:border-slate-400');
+            other.classList.remove('bg-blue-50','dark:bg-white/16','text-blue-700','dark:text-white','shadow-sm','border-l-2','border-blue-500','dark:border-white/70');
             other.classList.add('text-gray-600','dark:text-gray-400');
           });
-          btn.classList.add('bg-blue-50','dark:bg-slate-700/70','text-blue-700','dark:text-gray-100','shadow-sm','border-l-2','border-blue-500','dark:border-slate-400');
+          btn.classList.add('bg-blue-50','dark:bg-white/16','text-blue-700','dark:text-white','shadow-sm','border-l-2','border-blue-500','dark:border-white/70');
           btn.classList.remove('text-gray-600','dark:text-gray-400');
         });
       });
