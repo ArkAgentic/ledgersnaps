@@ -74,7 +74,7 @@
         <div class="flex items-center justify-between mb-8">
           <div>
             <h1 id="overview-title" class="text-3xl font-bold text-gray-900">Overview</h1>
-            <p id="overview-subtitle" class="text-gray-600 mt-1">Account status, AI quota, and integration readiness.</p>
+            <p id="overview-subtitle" class="text-gray-600 mt-1">Plan status, AI quota, and bookkeeping integration readiness.</p>
           </div>
           <div class="flex justify-end gap-3">
             <button id="lang-toggle" class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="Switch Language">
@@ -88,7 +88,7 @@
             <div class="flex items-center justify-between mb-4">
               <div class="p-2 bg-blue-50 rounded-lg"><i data-lucide="badge-check" class="h-5 w-5 text-blue-600"></i></div>
             </div>
-            <h3 id="kpi-plan-title" class="font-medium text-gray-600 mb-1">Current Plan</h3>
+            <h3 id="kpi-plan-title" class="font-medium text-gray-600 mb-1">Account Level</h3>
             <p id="kpi-plan" class="text-2xl font-bold text-gray-900">-</p>
             <p id="kpi-plan-sub" class="text-sm text-gray-500 mt-1">-</p>
           </div>
@@ -115,7 +115,7 @@
             <div class="flex items-center justify-between mb-4">
               <div class="p-2 bg-orange-50 rounded-lg"><i data-lucide="database" class="h-5 w-5 text-orange-600"></i></div>
             </div>
-            <h3 id="kpi-jobs-title" class="font-medium text-gray-600 mb-1">Jobs</h3>
+            <h3 id="kpi-jobs-title" class="font-medium text-gray-600 mb-1">Processing Queue</h3>
             <p id="kpi-jobs" class="text-2xl font-bold text-gray-900">-</p>
             <p id="kpi-jobs-sub" class="text-sm text-gray-500 mt-1">-</p>
           </div>
@@ -123,7 +123,7 @@
 
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm mb-8">
           <div class="flex items-center justify-between mb-4">
-            <h3 id="quota-title" class="text-lg font-semibold text-gray-900">Quota Breakdown</h3>
+            <h3 id="quota-title" class="text-lg font-semibold text-gray-900">Quota Allocation</h3>
             <span id="quota-total" class="text-sm text-gray-600">-</span>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -144,11 +144,11 @@
 
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-center justify-between mb-4">
-            <h3 id="recent-title" class="text-lg font-semibold text-gray-900">Recent Jobs</h3>
+            <h3 id="recent-title" class="text-lg font-semibold text-gray-900">Recent Processing Jobs</h3>
             <span id="recent-count" class="text-sm text-gray-500">-</span>
           </div>
           <div id="recent-jobs" class="space-y-3 text-sm text-gray-700">
-            <div class="text-gray-500">Loading...</div>
+            <div class="text-gray-500">Loading live data...</div>
           </div>
         </div>
       </div>
@@ -202,7 +202,7 @@
             text('kpi-plan', humanPlan(a.plan_id));
             text('kpi-plan-sub', a.plan_id === 'none' ? `Trial ends: ${String(trial.ends_at || '-').slice(0,10)}` : `Monthly quota: ${plan.invoice_limit || 0}`);
             text('kpi-ai-remaining', String(a.remaining_invoices ?? 0));
-            text('kpi-ai-sub', `Trial ${trial.remaining_invoices || 0} · Plan ${plan.remaining_invoices || 0} · Top-up ${top.remaining_invoices || 0}`);
+            text('kpi-ai-sub', `Trial ${trial.remaining_invoices || 0} · Plan ${plan.remaining_invoices || 0} · Top-up ${top.remaining_invoices || 0} remaining`);
             text('quota-total', `Total remaining: ${a.remaining_invoices || 0}`);
             text('trial-row', `${trial.used_invoices || 0} used / ${trial.invoice_limit || 0} · ${trial.remaining_invoices || 0} left`);
             text('plan-row', `${plan.used_invoices || 0} used / ${plan.invoice_limit || 0} · ${plan.remaining_invoices || 0} left`);
@@ -213,19 +213,19 @@
             const connected = !!xero.connected;
             text('kpi-xero', connected ? 'Connected' : 'Not Connected');
             const tenant = xero.active_tenant_name || xero.active_tenant_id || '-';
-            text('kpi-xero-sub', connected ? tenant : 'Authorize required');
+            text('kpi-xero-sub', connected ? tenant : 'Authorization required');
           }
 
           if (jobs) {
             const list = Array.isArray(jobs.jobs) ? jobs.jobs : [];
             text('kpi-jobs', String(list.length));
-            const processing = list.filter(j => (j.status || '').toLowerCase() === 'processing').length;
-            text('kpi-jobs-sub', `${processing} processing`);
+            const in progress = list.filter(j => (j.status || '').toLowerCase() === 'in progress').length;
+            text('kpi-jobs-sub', `${in progress} in progress`);
             text('recent-count', `${list.length} total`);
             const container = document.getElementById('recent-jobs');
             if (container) {
               if (!list.length) {
-                container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
+                container.innerHTML = '<div class="text-gray-500">No in progress jobs yet</div>';
               } else {
                 container.innerHTML = list.slice(0,5).map(j => {
                   const status = (j.status || '-').toUpperCase();
@@ -240,7 +240,7 @@
         } catch (e) {
           text('kpi-plan-sub', 'Failed to load live data');
           const container = document.getElementById('recent-jobs');
-          if (container) container.innerHTML = '<div class="text-red-500">Failed to load jobs</div>';
+          if (container) container.innerHTML = '<div class="text-red-500">Failed to load in progress jobs</div>';
         }
       }
 
@@ -266,16 +266,16 @@
           'Support':'支持',
           'Account':'账户',
           'Sign Out':'登出',
-          'Overview subtitle':'账户状态、AI额度与集成准备情况',
-          'Current Plan':'账户级别',
+          'Overview subtitle':'账户级别、AI额度与记账集成状态',
+          'Account Level':'账户等级',
           'AI Extraction Remaining':'AI提取剩余额度',
           'Xero Connection':'Xero 连接状态',
-          'Jobs':'任务总览',
-          'Quota Breakdown':'额度拆分',
+          'Processing Queue':'处理队列',
+          'Quota Allocation':'额度分配',
           'Trial':'试用',
           'Plan':'套餐',
           'Top-up':'充值包',
-          'Recent Jobs':'最近任务'
+          'Recent Processing Jobs':'最近处理任务'
         } : {
           'Overview':'Overview',
           'Upload & Extract':'Upload & Extract',
@@ -289,16 +289,16 @@
           'Support':'Support',
           'Account':'Account',
           'Sign Out':'Sign Out',
-          'Overview subtitle':'Account status, AI quota, and integration readiness.',
-          'Current Plan':'Current Plan',
+          'Overview subtitle':'Plan status, AI quota, and bookkeeping integration readiness.',
+          'Account Level':'Account Level',
           'AI Extraction Remaining':'AI Extraction Remaining',
           'Xero Connection':'Xero Connection',
-          'Jobs':'Jobs',
-          'Quota Breakdown':'Quota Breakdown',
+          'Processing Queue':'Processing Queue',
+          'Quota Allocation':'Quota Allocation',
           'Trial':'Trial',
           'Plan':'Plan',
           'Top-up':'Top-up',
-          'Recent Jobs':'Recent Jobs'
+          'Recent Processing Jobs':'Recent Processing Jobs'
         };
 
         document.querySelectorAll('.menu-option').forEach((btn) => {
@@ -314,15 +314,15 @@
         if (signoutLabel) signoutLabel.textContent = map['Sign Out'];
         text('overview-title', map['Overview']);
         text('overview-subtitle', map['Overview subtitle']);
-        text('kpi-plan-title', map['Current Plan']);
+        text('kpi-plan-title', map['Account Level']);
         text('kpi-ai-title', map['AI Extraction Remaining']);
         text('kpi-xero-title', map['Xero Connection']);
-        text('kpi-jobs-title', map['Jobs']);
-        text('quota-title', map['Quota Breakdown']);
+        text('kpi-jobs-title', map['Processing Queue']);
+        text('quota-title', map['Quota Allocation']);
         text('trial-label', map['Trial']);
         text('plan-label', map['Plan']);
         text('topup-label', map['Top-up']);
-        text('recent-title', map['Recent Jobs']);
+        text('recent-title', map['Recent Processing Jobs']);
 
         localStorage.setItem(LANG_KEY, zh ? 'zh' : 'en');
       }
