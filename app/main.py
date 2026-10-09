@@ -61,6 +61,7 @@ from .store import (
     mark_password_reset_token_used,
     mark_pending_signup_token_email_verified,
     mark_pending_signup_token_used,
+    cleanup_pending_signup_tokens,
     upsert_oauth_identity,
     upsert_local_credential,
     set_job_status_owned,
@@ -970,6 +971,8 @@ async def auth_signup(
     password: str = Query(..., min_length=8),
     accept_terms: bool = Query(...),
 ) -> dict:
+    cleanup_pending_signup_tokens()
+
     if not accept_terms:
         raise HTTPException(status_code=400, detail="terms_not_accepted")
 
@@ -1095,6 +1098,8 @@ async def auth_signup_resend_code(
     request: Request,
     email: str = Query(..., min_length=3),
 ) -> dict:
+    cleanup_pending_signup_tokens()
+    cleanup_pending_signup_tokens()
     email_norm = str(email or "").strip().lower()
     pending = get_latest_pending_signup_by_email(email_norm, status="pending")
     if not pending:

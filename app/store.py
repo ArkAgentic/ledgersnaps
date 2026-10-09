@@ -8,7 +8,7 @@ import uuid
 
 import psycopg
 from psycopg.rows import dict_row
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 _DB_LOCK = threading.Lock()
@@ -1749,6 +1749,37 @@ def mark_pending_signup_token_used(token_hash: str) -> None:
             (now, token_hash),
         )
         conn.commit()
+
+def cleanup_pending_signup_tokens(*, keep_days: int = 3) -> int:
+    cutoff_dt = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=max(0, int(keep_days)))
+    cutoff = cutoff_dt.isoformat()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM pending_signup_tokens
+                    WHERE status='used' OR expires_at < %s OR created_at < %s
+                    """,
+                    (cutoff, cutoff),
+                )
+                deleted = int(cur.rowcount or 0)
+            conn.commit()
+        return deleted
+
+    conn = _ensure_conn()
+    with _DB_LOCK:
+        cur = conn.execute(
+            """
+            DELETE FROM pending_signup_tokens
+            WHERE status='used' OR expires_at < ? OR created_at < ?
+            """,
+            (cutoff, cutoff),
+        )
+        conn.commit()
+        return int(cur.rowcount or 0)
+
 
 def reset_all_jobs_for_tests() -> None:
     if _pg_enabled():
