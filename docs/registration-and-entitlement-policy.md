@@ -52,7 +52,7 @@ Stored user profile fields:
 ## 4) Plans & Quota (Current Pricing)
 ### Trial
 - Duration: 7 days
-- Quota: 15 invoices (one-off trial pool)
+- Quota: 10 invoices (one-off trial pool)
 
 ### Paid Plans
 - `starter_14_95`: AUD 14.95 / 30 days / 100 invoices
