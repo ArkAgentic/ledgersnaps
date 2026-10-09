@@ -12,7 +12,7 @@ from typing import cast
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .abn import abr_lookup_by_name, compliance_warnings_for_abn, lookup_abn_context
@@ -452,6 +452,19 @@ async def pricing_page() -> HTMLResponse:
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+@app.get("/console", response_class=HTMLResponse)
+async def console_page() -> HTMLResponse:
+    response = _render_template_or_500("console.html", "console_template_missing")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/dashboard/upload")
+async def dashboard_upload_alias() -> RedirectResponse:
+    return RedirectResponse(url="/console", status_code=307)
 
 
 @app.get("/playground", response_class=HTMLResponse)
@@ -1073,7 +1086,7 @@ async def auth_signup_verify(request: Request, token: str = Query(..., min_lengt
     mark_pending_signup_token_used(token_hash)
 
     token_out = issue_dev_token(user_id=user_id, tenant_id="default")
-    return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/dashboard/upload"}
+    return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/console"}
 
 
 @app.post("/api/v1/auth/signup/resend-code")
@@ -1175,7 +1188,7 @@ async def auth_signup_verify_code(
     )
 
     token_out = issue_dev_token(user_id=user_id, tenant_id="default")
-    return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/dashboard/upload"}
+    return {"status": "signed_up", "user_id": user_id, "token": token_out, "redirect": "/console"}
 
 
 @app.post("/api/v1/auth/signup/phone/verify")
@@ -1208,7 +1221,7 @@ async def auth_signin_local(
         "status": "signed_in",
         "user_id": str(user.get("user_id")),
         "token": token,
-        "redirect": "/dashboard/upload",
+        "redirect": "/console",
     }
 
 
@@ -1397,7 +1410,7 @@ async def auth_xero_callback_public(code: str = Query(...), state: str = Query(.
                 expires_at=str(oauth.get("expires_at") or ""),
             )
         token = issue_dev_token(user_id=user_id, tenant_id="default")
-        return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/dashboard/upload"}
+        return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/console"}
 
     if provider_email:
         by_email = get_user_by_email(provider_email)
@@ -1421,7 +1434,7 @@ async def auth_xero_callback_public(code: str = Query(...), state: str = Query(.
                 expires_at=str(oauth.get("expires_at") or ""),
             )
             token = issue_dev_token(user_id=user_id, tenant_id="default")
-            return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/dashboard/upload"}
+            return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/console"}
 
     session_token = _issue_oauth_signup_token(
         {
@@ -1507,7 +1520,7 @@ async def auth_oauth_complete_signup(
     )
 
     token = issue_dev_token(user_id=user_id, tenant_id="default")
-    return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/dashboard/upload"}
+    return {"status": "signed_in", "user_id": user_id, "token": token, "redirect": "/console"}
 
 
 @app.get("/api/v1/billing/me")

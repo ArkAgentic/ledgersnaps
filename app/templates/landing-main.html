@@ -406,7 +406,7 @@
             if (!r.ok || !j.token) throw new Error(j.detail || 'signin_failed');
             try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
             document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
-            window.location.href = j.redirect || '/dashboard/upload';
+            window.location.href = j.redirect || '/console';
           } catch (e) {
             if (statusEl) statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '登录失败：' : 'Sign-in failed: ') + String(e.message || e);
           }
@@ -860,7 +860,7 @@
             try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
             document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
             setCreateStatus(document.documentElement.lang === 'zh-CN' ? '创建成功，正在跳转…' : 'Account created. Redirecting...', 'success');
-            window.location.href = j.redirect || '/dashboard/upload';
+            window.location.href = j.redirect || '/console';
             return;
           }
           try { localStorage.setItem('signup_verify_email', email.trim().toLowerCase()); } catch(e) {}
@@ -922,7 +922,7 @@
           }
           try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
           document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
-          window.location.href = j.redirect || '/dashboard/upload';
+          window.location.href = j.redirect || '/console';
         } catch (err) {
           if (verifyStatus) {
             verifyStatus.classList.remove('status-success');
