@@ -146,6 +146,60 @@ def _ensure_conn() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        _ensure_pg_auth_schema(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                  job_id TEXT PRIMARY KEY,
+                  tenant_id TEXT NOT NULL,
+                  user_id TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  file_count INTEGER NOT NULL DEFAULT 0,
+                  invoice_estimated INTEGER NOT NULL DEFAULT 0,
+                  metadata_json TEXT NOT NULL DEFAULT '{}'
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS job_results (
+                  job_id TEXT PRIMARY KEY,
+                  tenant_id TEXT NOT NULL,
+                  user_id TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  result_json TEXT NOT NULL,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS job_queue (
+                  id BIGSERIAL PRIMARY KEY,
+                  job_id TEXT NOT NULL UNIQUE,
+                  tenant_id TEXT NOT NULL,
+                  user_id TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'queued',
+                  attempts INTEGER NOT NULL DEFAULT 0,
+                  available_at TEXT NOT NULL,
+                  locked_at TEXT,
+                  worker_id TEXT,
+                  payload_json TEXT NOT NULL DEFAULT '{}',
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  last_error TEXT,
+                  last_error_at TEXT,
+                  last_attempt_at TEXT
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_created ON jobs(tenant_id, user_id, created_at DESC)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_status ON jobs(tenant_id, user_id, status)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_job_results_owner ON job_results(tenant_id, user_id, updated_at DESC)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_job_queue_status_available ON job_queue(status, available_at)")
+        conn.commit()
+        return
+
     conn = _CONN or sqlite3.connect(_db_path(), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     with _DB_LOCK:
@@ -349,9 +403,26 @@ def _now_iso() -> str:
 
 
 def create_job(tenant_id: str, user_id: str, *, file_count: int = 0, invoice_estimated: int = 0, metadata_json: str = "{}") -> dict[str, Any]:
-    conn = _ensure_conn()
     now = _now_iso()
     job_id = str(uuid.uuid4())
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO jobs(job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, metadata_json)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (job_id, tenant_id, user_id, "created", now, now, int(file_count), int(invoice_estimated), metadata_json),
+                )
+            conn.commit()
+        job = get_job_owned(tenant_id=tenant_id, user_id=user_id, job_id=job_id)
+        if not job:
+            raise RuntimeError("job_create_readback_failed")
+        return job
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
@@ -366,7 +437,6 @@ def create_job(tenant_id: str, user_id: str, *, file_count: int = 0, invoice_est
         raise RuntimeError("job_create_readback_failed")
     return job
 
-
 def update_job_submission_owned(
     tenant_id: str,
     user_id: str,
@@ -374,13 +444,27 @@ def update_job_submission_owned(
     *,
     file_count: int,
     invoice_estimated: int,
-    metadata: dict[str, Any],
-) -> bool:
-    conn = _ensure_conn()
+    metadata_json: str,
+) -> None:
     now = _now_iso()
-    metadata_json = json.dumps(metadata, ensure_ascii=False)
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE jobs
+                    SET file_count=%s, invoice_estimated=%s, metadata_json=%s, updated_at=%s
+                    WHERE tenant_id=%s AND user_id=%s AND job_id=%s
+                    """,
+                    (int(file_count), int(invoice_estimated), metadata_json, now, tenant_id, user_id, job_id),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
-        cur = conn.execute(
+        conn.execute(
             """
             UPDATE jobs
             SET file_count=?, invoice_estimated=?, metadata_json=?, updated_at=?
@@ -389,14 +473,27 @@ def update_job_submission_owned(
             (int(file_count), int(invoice_estimated), metadata_json, now, tenant_id, user_id, job_id),
         )
         conn.commit()
-    return cur.rowcount > 0
 
-
-def set_job_status_owned(tenant_id: str, user_id: str, job_id: str, status: str) -> bool:
-    conn = _ensure_conn()
+def set_job_status_owned(tenant_id: str, user_id: str, job_id: str, status: str) -> None:
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE jobs
+                    SET status=%s, updated_at=%s
+                    WHERE tenant_id=%s AND user_id=%s AND job_id=%s
+                    """,
+                    (status, now, tenant_id, user_id, job_id),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
-        cur = conn.execute(
+        conn.execute(
             """
             UPDATE jobs
             SET status=?, updated_at=?
@@ -405,8 +502,6 @@ def set_job_status_owned(tenant_id: str, user_id: str, job_id: str, status: str)
             (status, now, tenant_id, user_id, job_id),
         )
         conn.commit()
-    return cur.rowcount > 0
-
 
 def set_job_extraction_metrics_owned(
     tenant_id: str,
@@ -415,39 +510,74 @@ def set_job_extraction_metrics_owned(
     *,
     invoice_extracted_count: int,
     extracted_total_amount: float,
-) -> bool:
-    conn = _ensure_conn()
+) -> None:
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE jobs
+                    SET invoice_extracted_count=%s, extracted_total_amount=%s, updated_at=%s
+                    WHERE tenant_id=%s AND user_id=%s AND job_id=%s
+                    """,
+                    (int(invoice_extracted_count), float(extracted_total_amount), now, tenant_id, user_id, job_id),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
-        cur = conn.execute(
+        conn.execute(
             """
             UPDATE jobs
             SET invoice_extracted_count=?, extracted_total_amount=?, updated_at=?
             WHERE tenant_id=? AND user_id=? AND job_id=?
             """,
-            (
-                int(max(0, invoice_extracted_count)),
-                float(max(0.0, extracted_total_amount)),
-                now,
-                tenant_id,
-                user_id,
-                job_id,
-            ),
+            (int(invoice_extracted_count), float(extracted_total_amount), now, tenant_id, user_id, job_id),
         )
         conn.commit()
-    return cur.rowcount > 0
 
-
-def upsert_job_result_owned(tenant_id: str, user_id: str, job_id: str, status: str, result: dict[str, Any]) -> None:
-    conn = _ensure_conn()
+def upsert_job_result_owned(
+    tenant_id: str,
+    user_id: str,
+    job_id: str,
+    *,
+    status: str,
+    result: dict[str, Any],
+) -> None:
     now = _now_iso()
     payload = json.dumps(result, ensure_ascii=False)
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO job_results(job_id, tenant_id, user_id, status, result_json, created_at, updated_at)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(job_id) DO UPDATE SET
+                      tenant_id=excluded.tenant_id,
+                      user_id=excluded.user_id,
+                      status=excluded.status,
+                      result_json=excluded.result_json,
+                      updated_at=excluded.updated_at
+                    """,
+                    (job_id, tenant_id, user_id, status, payload, now, now),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
             INSERT INTO job_results(job_id, tenant_id, user_id, status, result_json, created_at, updated_at)
             VALUES(?,?,?,?,?,?,?)
             ON CONFLICT(job_id) DO UPDATE SET
+              tenant_id=excluded.tenant_id,
+              user_id=excluded.user_id,
               status=excluded.status,
               result_json=excluded.result_json,
               updated_at=excluded.updated_at
@@ -456,111 +586,222 @@ def upsert_job_result_owned(tenant_id: str, user_id: str, job_id: str, status: s
         )
         conn.commit()
 
-
-def enqueue_job_owned(tenant_id: str, user_id: str, job_id: str, payload: dict[str, Any]) -> None:
-    conn = _ensure_conn()
+def enqueue_job_owned(
+    tenant_id: str,
+    user_id: str,
+    job_id: str,
+    *,
+    payload: dict[str, Any],
+    available_at: Optional[str] = None,
+) -> None:
     now = _now_iso()
+    avail = available_at or now
     payload_json = json.dumps(payload, ensure_ascii=False)
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO job_queue(job_id, tenant_id, user_id, status, attempts, available_at, payload_json, created_at, updated_at)
+                    VALUES(%s,%s,%s,'queued',0,%s,%s,%s,%s)
+                    ON CONFLICT(job_id) DO UPDATE SET
+                      tenant_id=excluded.tenant_id,
+                      user_id=excluded.user_id,
+                      status='queued',
+                      available_at=excluded.available_at,
+                      payload_json=excluded.payload_json,
+                      updated_at=excluded.updated_at
+                    """,
+                    (job_id, tenant_id, user_id, avail, payload_json, now, now),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
             INSERT INTO job_queue(job_id, tenant_id, user_id, status, attempts, available_at, payload_json, created_at, updated_at)
             VALUES(?,?,?,?,?,?,?,?,?)
             ON CONFLICT(job_id) DO UPDATE SET
+              tenant_id=excluded.tenant_id,
+              user_id=excluded.user_id,
               status='queued',
               available_at=excluded.available_at,
               payload_json=excluded.payload_json,
               updated_at=excluded.updated_at
             """,
-            (job_id, tenant_id, user_id, "queued", 0, now, payload_json, now, now),
+            (job_id, tenant_id, user_id, 'queued', 0, avail, payload_json, now, now),
         )
         conn.commit()
 
-
-def mark_job_queue_running(job_id: str, worker_id: str) -> None:
-    conn = _ensure_conn()
+def mark_job_queue_running(job_id: str, *, worker_id: str) -> None:
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE job_queue
+                    SET status='running', locked_at=%s, worker_id=%s, attempts=attempts+1, updated_at=%s, last_attempt_at=%s
+                    WHERE job_id=%s
+                    """,
+                    (now, worker_id, now, now, job_id),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
             UPDATE job_queue
-            SET status='running', locked_at=?, worker_id=?, attempts=attempts+1, updated_at=?
+            SET status='running', locked_at=?, worker_id=?, attempts=attempts+1, updated_at=?, last_attempt_at=?
             WHERE job_id=?
             """,
-            (now, worker_id, now, job_id),
+            (now, worker_id, now, now, job_id),
         )
         conn.commit()
 
-
-def mark_job_queue_done(job_id: str, status: str) -> None:
-    conn = _ensure_conn()
+def mark_job_queue_done(job_id: str, status: str = "completed") -> None:
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE job_queue
+                    SET status=%s, updated_at=%s, locked_at=NULL, worker_id=NULL
+                    WHERE job_id=%s
+                    """,
+                    (status, now, job_id),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
             UPDATE job_queue
-            SET status=?, updated_at=?
+            SET status=?, updated_at=?, locked_at=NULL, worker_id=NULL
             WHERE job_id=?
             """,
             (status, now, job_id),
         )
         conn.commit()
 
-
 def mark_job_queue_retry(job_id: str, *, error: str, backoff_seconds: int) -> None:
+    now = _now_iso()
+    avail = datetime.now(timezone.utc).timestamp() + max(0, int(backoff_seconds))
+    available_at = datetime.fromtimestamp(avail, tz=timezone.utc).isoformat()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE job_queue
+                    SET status='queued', available_at=%s, updated_at=%s, locked_at=NULL, worker_id=NULL,
+                        last_error=%s, last_error_at=%s
+                    WHERE job_id=%s
+                    """,
+                    (available_at, now, error, now, job_id),
+                )
+            conn.commit()
+        return
+
     conn = _ensure_conn()
-    now_dt = datetime.now(timezone.utc)
-    now = now_dt.isoformat()
-    available_at = (now_dt.timestamp() + max(1, int(backoff_seconds)))
-    available_at_iso = datetime.fromtimestamp(available_at, tz=timezone.utc).isoformat()
     with _DB_LOCK:
         conn.execute(
             """
             UPDATE job_queue
-            SET status='queued',
-                available_at=?,
-                last_error=?,
-                last_error_at=?,
-                last_attempt_at=?,
-                updated_at=?
+            SET status='queued', available_at=?, updated_at=?, locked_at=NULL, worker_id=NULL,
+                last_error=?, last_error_at=?
             WHERE job_id=?
             """,
-            (available_at_iso, str(error)[:2000], now, now, now, job_id),
+            (available_at, now, error, now, job_id),
         )
         conn.commit()
-
 
 def mark_job_queue_failed(job_id: str, *, error: str) -> None:
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE job_queue
+                    SET status='failed', updated_at=%s, locked_at=NULL, worker_id=NULL,
+                        last_error=%s, last_error_at=%s
+                    WHERE job_id=%s
+                    """,
+                    (now, error, now, job_id),
+                )
+            conn.commit()
+        return
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute(
             """
             UPDATE job_queue
-            SET status='failed',
-                last_error=?,
-                last_error_at=?,
-                last_attempt_at=?,
-                updated_at=?
+            SET status='failed', updated_at=?, locked_at=NULL, worker_id=NULL,
+                last_error=?, last_error_at=?
             WHERE job_id=?
             """,
-            (str(error)[:2000], now, now, now, job_id),
+            (now, error, now, job_id),
         )
         conn.commit()
 
-
 def list_queue_counts() -> dict[str, int]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        out = {"queued": 0, "running": 0, "failed": 0, "completed": 0}
+        with conn.cursor() as cur:
+            cur.execute("SELECT status, COUNT(*) c FROM job_queue GROUP BY status")
+            for row in cur.fetchall() or []:
+                st = str(row[0])
+                if st in out:
+                    out[st] = int(row[1])
+        return out
+
     conn = _ensure_conn()
-    out = {"queued": 0, "running": 0, "completed": 0, "failed": 0}
-    cur = conn.execute("SELECT status, COUNT(*) as c FROM job_queue GROUP BY status")
+    out = {"queued": 0, "running": 0, "failed": 0, "completed": 0}
+    cur = conn.execute("SELECT status, COUNT(*) c FROM job_queue GROUP BY status")
     for row in cur.fetchall():
         st = str(row["status"])
         if st in out:
             out[st] = int(row["c"])
     return out
 
-
 def get_queue_item(job_id: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, job_id, tenant_id, user_id, status, attempts, available_at, locked_at, worker_id, payload_json, last_error, last_error_at, last_attempt_at, created_at, updated_at
+                FROM job_queue
+                WHERE job_id=%s
+                LIMIT 1
+                """,
+                (job_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["payload"] = json.loads(d.get("payload_json") or "{}")
+            except Exception:
+                d["payload"] = {}
+            return d
+
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -576,13 +817,21 @@ def get_queue_item(job_id: str) -> Optional[dict[str, Any]]:
         return None
     d = dict(row)
     try:
-        d["payload"] = json.loads(d.pop("payload_json"))
+        d["payload"] = json.loads(d.get("payload_json") or "{}")
     except Exception:
         d["payload"] = {}
     return d
 
-
 def get_queue_attempts(job_id: str) -> int:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT attempts FROM job_queue WHERE job_id=%s LIMIT 1", (job_id,))
+            row = cur.fetchone()
+            if not row:
+                return 0
+            return int(row[0])
+
     conn = _ensure_conn()
     cur = conn.execute("SELECT attempts FROM job_queue WHERE job_id=? LIMIT 1", (job_id,))
     row = cur.fetchone()
@@ -590,11 +839,49 @@ def get_queue_attempts(job_id: str) -> int:
         return 0
     return int(row["attempts"])
 
-
 def dequeue_next_job(worker_id: str) -> Optional[dict[str, Any]]:
-    """Claim next queued job (FIFO by id) and mark running atomically under process lock."""
-    conn = _ensure_conn()
     now = _now_iso()
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, job_id, tenant_id, user_id, payload_json
+                    FROM job_queue
+                    WHERE status='queued' AND available_at <= %s
+                    ORDER BY id ASC
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                    """,
+                    (now,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    conn.commit()
+                    return None
+                cur.execute(
+                    """
+                    UPDATE job_queue
+                    SET status='running', locked_at=%s, worker_id=%s, attempts=attempts+1, updated_at=%s, last_attempt_at=%s
+                    WHERE id=%s
+                    """,
+                    (now, worker_id, now, now, row["id"]),
+                )
+            conn.commit()
+        payload_json = row.get("payload_json") or "{}"
+        try:
+            payload = json.loads(payload_json)
+        except Exception:
+            payload = {}
+        return {
+            "job_id": row["job_id"],
+            "tenant_id": row["tenant_id"],
+            "user_id": row["user_id"],
+            "payload": payload,
+        }
+
+    conn = _ensure_conn()
     with _DB_LOCK:
         cur = conn.execute(
             """
@@ -609,32 +896,50 @@ def dequeue_next_job(worker_id: str) -> Optional[dict[str, Any]]:
         row = cur.fetchone()
         if not row:
             return None
-        job_id = str(row["job_id"])
         conn.execute(
             """
             UPDATE job_queue
-            SET status='running', locked_at=?, worker_id=?, attempts=attempts+1, updated_at=?
-            WHERE job_id=?
+            SET status='running', locked_at=?, worker_id=?, attempts=attempts+1, updated_at=?, last_attempt_at=?
+            WHERE id=?
             """,
-            (now, worker_id, now, job_id),
+            (now, worker_id, now, now, int(row["id"])),
         )
         conn.commit()
-
-    payload_raw = row["payload_json"]
+    payload_json = row["payload_json"]
     try:
-        payload = json.loads(payload_raw)
+        payload = json.loads(payload_json)
     except Exception:
         payload = {}
     return {
-        "id": int(row["id"]),
-        "job_id": job_id,
-        "tenant_id": str(row["tenant_id"]),
-        "user_id": str(row["user_id"]),
+        "job_id": row["job_id"],
+        "tenant_id": row["tenant_id"],
+        "user_id": row["user_id"],
         "payload": payload,
     }
 
-
 def get_job_result_owned(tenant_id: str, user_id: str, job_id: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT job_id, tenant_id, user_id, status, result_json, created_at, updated_at
+                FROM job_results
+                WHERE tenant_id=%s AND user_id=%s AND job_id=%s
+                LIMIT 1
+                """,
+                (tenant_id, user_id, job_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["result"] = json.loads(d.pop("result_json"))
+            except Exception:
+                d["result"] = {}
+            return d
+
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -655,8 +960,23 @@ def get_job_result_owned(tenant_id: str, user_id: str, job_id: str) -> Optional[
         d["result"] = {}
     return d
 
-
 def list_jobs_owned(tenant_id: str, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, invoice_extracted_count, extracted_total_amount, metadata_json
+                FROM jobs
+                WHERE tenant_id=%s AND user_id=%s
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (tenant_id, user_id, int(limit)),
+            )
+            rows = cur.fetchall() or []
+            return [dict(r) for r in rows]
+
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -671,8 +991,22 @@ def list_jobs_owned(tenant_id: str, user_id: str, limit: int = 50) -> list[dict[
     rows = cur.fetchall()
     return [dict(r) for r in rows]
 
-
 def get_job_owned(tenant_id: str, user_id: str, job_id: str) -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT job_id, tenant_id, user_id, status, created_at, updated_at, file_count, invoice_estimated, invoice_extracted_count, extracted_total_amount, metadata_json
+                FROM jobs
+                WHERE tenant_id=%s AND user_id=%s AND job_id=%s
+                LIMIT 1
+                """,
+                (tenant_id, user_id, job_id),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
     conn = _ensure_conn()
     cur = conn.execute(
         """
@@ -685,7 +1019,6 @@ def get_job_owned(tenant_id: str, user_id: str, job_id: str) -> Optional[dict[st
     )
     row = cur.fetchone()
     return dict(row) if row else None
-
 
 def upsert_user_entitlement(
     user_id: str,
@@ -1418,6 +1751,24 @@ def mark_pending_signup_token_used(token_hash: str) -> None:
         conn.commit()
 
 def reset_all_jobs_for_tests() -> None:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with _DB_LOCK:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM oauth_identities")
+                cur.execute("DELETE FROM xero_connections")
+                cur.execute("DELETE FROM local_credentials")
+                cur.execute("DELETE FROM password_reset_tokens")
+                cur.execute("DELETE FROM signup_audit")
+                cur.execute("DELETE FROM pending_signup_tokens")
+                cur.execute("DELETE FROM users")
+                cur.execute("DELETE FROM user_entitlements")
+                cur.execute("DELETE FROM job_queue")
+                cur.execute("DELETE FROM job_results")
+                cur.execute("DELETE FROM jobs")
+            conn.commit()
+        return
+
     conn = _ensure_conn()
     with _DB_LOCK:
         conn.execute("DELETE FROM oauth_identities")
@@ -1432,3 +1783,4 @@ def reset_all_jobs_for_tests() -> None:
         conn.execute("DELETE FROM job_results")
         conn.execute("DELETE FROM jobs")
         conn.commit()
+
