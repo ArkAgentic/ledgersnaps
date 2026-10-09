@@ -50,21 +50,25 @@
         </div>
 
         <div class="space-y-1 mb-8" id="menu-primary">
-          <button data-title="Dashboard" class="menu-option relative flex h-11 w-full items-center rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm border-l-2 border-blue-500">
-            <div class="grid h-full w-12 place-content-center"><i data-lucide="house" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Dashboard</span>
+          <button data-title="Overview" class="menu-option relative flex h-11 w-full items-center rounded-md bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm border-l-2 border-blue-500">
+            <div class="grid h-full w-12 place-content-center"><i data-lucide="layout-dashboard" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Overview</span>
           </button>
-          
-          
-          <button data-title="Products" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="shopping-cart" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Products</span></button>
+          <button data-title="Upload & Extract" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="upload" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Upload & Extract</span></button>
+          <button data-title="Jobs / History" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="history" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Jobs / History</span></button>
+          <button data-title="Draft Bills (Xero/MYOB)" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="file-check-2" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Draft Bills (Xero/MYOB)</span></button>
+          <button data-title="Exports (Excel)" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="sheet" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Exports (Excel)</span></button>
+          <button data-title="ABN/GST Validation" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="shield-check" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">ABN/GST Validation</span></button>
+          <button data-title="Pricing & Top-up" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="wallet" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Pricing & Top-up</span></button>
+        </div><span class="menu-label text-sm font-medium">Products</span></button>
           
           <button data-title="Analytics" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="bar-chart-3" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Analytics</span></button>
           
         </div>
 
         <div id="account-block" class="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-1">
-          <div class="menu-label px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account</div>
+          <div class="menu-label px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Workspace</div>
           <button data-title="Settings" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="settings" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Settings</span></button>
-          <button data-title="Help & Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Help & Support</span></button>
+          <button data-title="Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Support</span></button>
         </div>
 
         <button id="sidebar-toggle" class="absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-800 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -78,8 +82,8 @@
       <div class="flex-1 p-6 overflow-auto">
         <div class="flex items-center justify-between mb-8">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-1">Welcome back to your dashboard</p>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">LedgerSnaps Console</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-1">Invoice extraction operations, compliance checks, and billing in one workspace.</p>
           </div>
           <div class="flex items-center gap-4">
             <button class="relative p-2 rounded-lg card-surface border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"><i data-lucide="bell" class="h-5 w-5"></i><span class="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span></button>
