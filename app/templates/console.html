@@ -53,12 +53,12 @@
           <button data-title="Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4"></i></div><span class="menu-label text-sm font-medium">Support</span></button>
         </div>
 
-        <button id="sidebar-toggle" class="absolute bottom-0 left-0 right-0 border-t border-gray-200 transition-colors hover:bg-gray-50">
+        <a href="/" id="signout-link" class="absolute bottom-0 left-0 right-0 border-t border-gray-200 transition-colors hover:bg-gray-50">
           <div class="flex items-center p-3">
-            <div class="grid size-10 place-content-center"><span id="sidebar-toggle-icon" class="text-base font-semibold text-gray-600">«</span></div>
-            <span id="sidebar-toggle-label" class="menu-label text-sm font-medium text-gray-600">Hide</span>
+            <div class="grid size-10 place-content-center"><i data-lucide="log-out" class="h-4 w-4 text-gray-600"></i></div>
+            <span class="menu-label text-sm font-medium text-gray-600">Sign Out</span>
           </div>
-        </button>
+        </a>
       </nav>
 
       <div id="main-pane" class="flex-1 p-6 overflow-auto text-black">
@@ -78,12 +78,6 @@
       const langToggle = document.getElementById('lang-toggle');
       const langToggleLabel = document.getElementById('lang-toggle-label');
       const sidebarLogo = document.getElementById('sidebar-logo');
-      const sidebar = document.getElementById('sidebar');
-      const sidebarToggle = document.getElementById('sidebar-toggle');
-      const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
-      const sidebarToggleLabel = document.getElementById('sidebar-toggle-label');
-      const accountBlock = document.getElementById('account-block');
-      const SIDEBAR_KEY = 'ledgersnaps_console_sidebar_open';
       const LANG_KEY = 'ledgersnaps_console_lang';
 
       function applyTheme() {
@@ -134,25 +128,9 @@
         localStorage.setItem(LANG_KEY, zh ? 'zh' : 'en');
       }
 
-      function setSidebar(open) {
-        sidebar.classList.toggle('w-64', open);
-        sidebar.classList.toggle('w-16', !open);
-        document.querySelectorAll('.menu-label').forEach(el => el.classList.toggle('hidden', !open));
-        if (accountBlock) accountBlock.classList.toggle('hidden', !open);
-        if (sidebarToggleLabel) sidebarToggleLabel.classList.toggle('hidden', !open);
-        if (sidebarToggleIcon) {
-          sidebarToggleIcon.textContent = open ? '«' : '»';
-        }
-        localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0');
-        lucide.createIcons();
-      }
 
       applyTheme();
-      setSidebar(localStorage.getItem(SIDEBAR_KEY) !== '0');
       applyLanguage(localStorage.getItem(LANG_KEY) === 'zh' ? 'zh' : 'en');
-      if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', () => setSidebar(!sidebar.classList.contains('w-64')));
-      }
       if (langToggle) {
         langToggle.addEventListener('click', () => {
           const next = (localStorage.getItem(LANG_KEY) === 'zh') ? 'en' : 'zh';
