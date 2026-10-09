@@ -546,7 +546,11 @@
 
       function showLeftMain(updateHistory = true) {
         if (leftMainContent) leftMainContent.classList.remove('hidden');
-        if (leftLegalPanel) leftLegalPanel.classList.add('hidden');
+        if (leftLegalPanel) {
+          leftLegalPanel.classList.add('hidden');
+          leftLegalPanel.classList.remove('md:flex', 'md:items-center');
+        }
+        if (leftLegalShell) leftLegalShell.classList.remove('my-auto');
         currentLegalKind = null;
         if (updateHistory) {
           history.replaceState({}, '', '/');
