@@ -1261,7 +1261,11 @@ async def auth_password_forgot(
     email: str = Query(..., min_length=3),
 ) -> dict:
     email_norm = str(email or "").strip().lower()
-    user = get_user_by_email(email_norm)
+    try:
+        user = get_user_by_email(email_norm)
+    except Exception:
+        # keep outward response generic and avoid surfacing backend lookup errors
+        return {"ok": True, "status": "accepted"}
     # Always return generic response to avoid account enumeration.
     if not user:
         return {"ok": True, "status": "accepted"}

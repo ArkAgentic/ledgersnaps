@@ -378,6 +378,7 @@
         const btn = document.getElementById('btn-xero');
         const statusEl = document.getElementById('auth-status');
         if (!btn) return;
+        if (sendResetBtn) { sendResetBtn.disabled = true; sendResetBtn.classList.add('opacity-60','cursor-not-allowed'); }
         try {
           btn.classList.add('btn-loading');
           if (statusEl) statusEl.textContent = document.documentElement.lang === 'zh-CN' ? '正在跳转到 Xero 授权…' : 'Redirecting to Xero authorization…';
@@ -409,6 +410,7 @@
           const password = (document.getElementById('password-input') || {}).value || '';
           const statusEl = document.getElementById('auth-status');
           if (statusEl) statusEl.textContent = '';
+          if (signInBtnEl) { signInBtnEl.disabled = true; signInBtnEl.classList.add('opacity-60','cursor-not-allowed'); }
           try {
             const q = new URLSearchParams({ email: String(email).trim(), password: String(password) });
             const r = await fetch('/api/v1/auth/signin/local?' + q.toString(), { method: 'POST' });
@@ -432,6 +434,8 @@
                 statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '登录失败：' : 'Sign-in failed: ') + msg;
               }
             }
+          } finally {
+            if (signInBtnEl) { signInBtnEl.disabled = false; signInBtnEl.classList.remove('opacity-60','cursor-not-allowed'); }
           }
         });
       }
@@ -1027,14 +1031,18 @@
         try {
           const q = new URLSearchParams({ email: String(email).trim() });
           const r = await fetch('/api/v1/auth/password/forgot?' + q.toString(), { method: 'POST' });
-          const j = await r.json();
-          if (!r.ok) throw new Error(j.detail || 'forgot_password_failed');
+          const raw = await r.text();
+          let j = {};
+          try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = {}; }
+          if (!r.ok) throw new Error((j && j.detail) ? j.detail : ('http_' + r.status));
           if (resetStatus) {
             const base = (document.documentElement.lang === 'zh-CN' ? '如果该邮箱已注册，我们已发送重置方式。' : 'If this email is registered, we have sent reset instructions.');
             resetStatus.textContent = j.dev_reset_token ? `${base} [dev token: ${j.dev_reset_token}]` : base;
           }
         } catch (e) {
           if (resetStatus) resetStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '发送失败：' : 'Send failed: ') + String(e.message || e);
+        } finally {
+          if (sendResetBtn) { sendResetBtn.disabled = false; sendResetBtn.classList.remove('opacity-60','cursor-not-allowed'); }
         }
       });
 
