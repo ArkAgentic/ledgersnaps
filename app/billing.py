@@ -7,8 +7,12 @@ import os
 import sqlite3
 from typing import Optional
 
-import psycopg
-from psycopg.rows import dict_row
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except Exception:  # pragma: no cover
+    psycopg = None
+    dict_row = None
 
 # Paid plans (AUD)
 PLAN_CATALOG = {
@@ -99,7 +103,7 @@ def _pg_dsn() -> Optional[str]:
 
 
 def _pg_enabled() -> bool:
-    return _pg_dsn() is not None
+    return (_pg_dsn() is not None) and (psycopg is not None)
 
 
 def _ensure_schema() -> None:
@@ -163,6 +167,8 @@ def _ensure_pg_conn() -> psycopg.Connection:
     dsn = _pg_dsn()
     if not dsn:
         raise RuntimeError("postgres_dsn_missing")
+    if psycopg is None or dict_row is None:
+        raise RuntimeError("psycopg_not_installed")
     _PG_CONN = psycopg.connect(dsn, autocommit=False, row_factory=dict_row)
     return _PG_CONN
 
