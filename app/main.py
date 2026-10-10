@@ -1017,19 +1017,26 @@ async def auth_signup(
     token_hash = _sha256_hex(raw_token)
     expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
 
-    create_pending_signup_token(
-        token_hash=token_hash,
-        email=email_norm,
-        full_name=full_name,
-        phone_e164=phone_e164,
-        password_salt=salt_hex,
-        password_hash=digest_hex,
-        terms_version="v1",
-        accepted_at=accepted_at,
-        signup_ip=signup_ip,
-        user_agent=user_agent,
-        expires_at=expires_at,
-    )
+    try:
+        create_pending_signup_token(
+            token_hash=token_hash,
+            email=email_norm,
+            full_name=full_name,
+            phone_e164=phone_e164,
+            password_salt=salt_hex,
+            password_hash=digest_hex,
+            terms_version="v1",
+            accepted_at=accepted_at,
+            signup_ip=signup_ip,
+            user_agent=user_agent,
+            expires_at=expires_at,
+        )
+    except Exception as e:
+        msg = str(e).lower()
+        logger.exception("signup_create_pending_token_failed", extra={"email": email_norm, "error": str(e)})
+        if "duplicate" in msg or "unique" in msg or "already exists" in msg:
+            raise HTTPException(status_code=409, detail="email_verification_pending") from e
+        raise HTTPException(status_code=503, detail="signup_temporarily_unavailable") from e
 
     verify_code = f"{int(token_hash[:12], 16) % 1000000:06d}"
     host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
