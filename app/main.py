@@ -1230,7 +1230,11 @@ async def auth_signin_local(
     password: str = Query(..., min_length=1),
 ) -> dict:
     email_norm = str(email or "").strip().lower()
-    user = get_user_by_email(email_norm)
+    try:
+        user = get_user_by_email(email_norm)
+    except Exception:
+        # fail closed for auth: do not leak backend errors as 500 on signin
+        raise HTTPException(status_code=401, detail="invalid_credentials")
     if not user:
         raise HTTPException(status_code=401, detail="invalid_credentials")
 

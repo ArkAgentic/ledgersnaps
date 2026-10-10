@@ -28,11 +28,23 @@ def _pg_enabled() -> bool:
 
 def _ensure_pg_conn() -> psycopg.Connection:
     global _PG_CONN
-    if _PG_CONN is not None and not _PG_CONN.closed:
-        return _PG_CONN
     dsn = _pg_dsn()
     if not dsn:
         raise RuntimeError("postgres_dsn_missing")
+
+    # Reuse healthy connection when possible.
+    if _PG_CONN is not None and not _PG_CONN.closed:
+        try:
+            with _PG_CONN.cursor() as cur:
+                cur.execute("SELECT 1")
+            return _PG_CONN
+        except Exception:
+            try:
+                _PG_CONN.close()
+            except Exception:
+                pass
+            _PG_CONN = None
+
     conn = psycopg.connect(dsn, autocommit=False, row_factory=dict_row)
     _PG_CONN = conn
     _ensure_pg_auth_schema(conn)
@@ -1355,7 +1367,7 @@ def get_user_by_phone(phone_e164: str) -> Optional[dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+                SELECT *
                 FROM users
                 WHERE phone_e164=%s
                 LIMIT 1
@@ -1367,7 +1379,7 @@ def get_user_by_phone(phone_e164: str) -> Optional[dict[str, Any]]:
     conn = _ensure_conn()
     cur = conn.execute(
         """
-        SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+        SELECT *
         FROM users
         WHERE phone_e164=?
         LIMIT 1
@@ -1383,7 +1395,7 @@ def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+                SELECT *
                 FROM users
                 WHERE email=%s
                 LIMIT 1
@@ -1395,7 +1407,7 @@ def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
     conn = _ensure_conn()
     cur = conn.execute(
         """
-        SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+        SELECT *
         FROM users
         WHERE email=?
         LIMIT 1
@@ -1411,7 +1423,7 @@ def get_user_by_id(user_id: str) -> Optional[dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+                SELECT *
                 FROM users
                 WHERE user_id=%s
                 LIMIT 1
@@ -1423,7 +1435,7 @@ def get_user_by_id(user_id: str) -> Optional[dict[str, Any]]:
     conn = _ensure_conn()
     cur = conn.execute(
         """
-        SELECT user_id, email, phone_e164, full_name, signup_ip, created_at, updated_at
+        SELECT *
         FROM users
         WHERE user_id=?
         LIMIT 1
