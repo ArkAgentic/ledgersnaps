@@ -264,7 +264,7 @@
             const zh = (localStorage.getItem(LANG_KEY) === 'zh');
             const planLabel = a.plan_id === 'starter_14_95' ? (zh ? '基础版' : 'Starter') : a.plan_id === 'pro_29_95' ? (zh ? '高级版' : 'Pro') : (zh ? '试用' : 'Trial');
             text('kpi-plan', planLabel);
-            text('kpi-plan-sub', a.plan_id === 'none' ? (zh ? `试用到期：${String(trial.ends_at || '-').slice(0,10)}` : `Trial ends: ${String(trial.ends_at || '-').slice(0,10)}`) : (zh ? `月额度：${plan.invoice_limit || 0}` : `Monthly quota: ${plan.invoice_limit || 0}`));
+            text('kpi-plan-sub', a.plan_id === 'none' ? (zh ? `试用到期：${String(trial.ends_at || '-').slice(0,10)}` : `Trial ends: ${String(trial.ends_at || '-').slice(0,10)}`) : (zh ? `套餐到期：${String(plan.period_end || '-').slice(0,10)}` : `Plan renews: ${String(plan.period_end || '-').slice(0,10)}`));
             text('kpi-ai-remaining', String(a.remaining_invoices ?? 0));
             text('kpi-ai-sub', zh ? `试用 ${trial.remaining_invoices || 0} · 月度 ${plan.remaining_invoices || 0} · 充值 ${top.remaining_invoices || 0} 剩余` : `Trial ${trial.remaining_invoices || 0} · Plan ${plan.remaining_invoices || 0} · Top-up ${top.remaining_invoices || 0} remaining`);
             text('trial-row', `${trial.remaining_invoices || 0} / ${trial.invoice_limit || 0}`);
