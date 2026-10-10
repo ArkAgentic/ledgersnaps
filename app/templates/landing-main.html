@@ -171,6 +171,7 @@
           </div>
 
           <button class="mt-6 w-[80%] mx-auto h-11 rounded-xl bg-[#E32652] text-white font-normal block" id="btn-signin" data-i18n="sign_in">Sign In</button>
+          <p id="auth-status" class="w-[80%] mx-auto mt-3 text-sm min-h-[20px]"></p>
 
           <p id="signup-cta" class="mt-5 w-[80%] mx-auto text-sm text-neutral-600 text-center leading-6"><span data-i18n="no_account">Don’t have an account yet?</span><br><button type="button" id="start-trial-link" class="inline-block mt-1 text-[#E32652] underline" data-i18n="start_trial">Start your 7-day free trial</button><br><button type="button" id="forgot-password-link" class="inline-block mt-2 text-neutral-600 hover:text-neutral-800 underline" data-i18n="forgot_password">Forgot password?</button></p>
           </div>
@@ -327,6 +328,8 @@
         }
       };
 
+      let currentLegalKind = null;
+
       function normalizeLang(lang) {
         const v = String(lang || '').toLowerCase();
         return (v === 'zh' || v === 'cn') ? 'zh' : 'en';
@@ -402,8 +405,10 @@
           try {
             const q = new URLSearchParams({ email: String(email).trim(), password: String(password) });
             const r = await fetch('/api/v1/auth/signin/local?' + q.toString(), { method: 'POST' });
-            const j = await r.json();
-            if (!r.ok || !j.token) throw new Error(j.detail || 'signin_failed');
+            const raw = await r.text();
+            let j = {};
+            try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = { detail: raw || 'signin_failed' }; }
+            if (!r.ok || !j.token) throw new Error((j && j.detail) ? j.detail : ('http_' + r.status));
             try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
             document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
             window.location.href = j.redirect || '/console';
@@ -447,7 +452,6 @@
       const resendCodeBtn = document.getElementById('btn-resend-code');
       let resendCooldownTimer = null;
       let resendCooldownRemaining = 0;
-      let currentLegalKind = null;
 
       function getPanelKindFromPath(path) {
         if (path === '/privacy') return 'privacy';
