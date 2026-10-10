@@ -440,18 +440,22 @@
         });
       }
 
-      if (passwordToggle && passwordInput) {
-        passwordToggle.addEventListener('click', () => {
-          const hidden = passwordInput.type === 'password';
-          passwordInput.type = hidden ? 'text' : 'password';
-          const icon = passwordToggle.querySelector('i');
-          if (icon) {
-            icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-              window.lucide.createIcons();
+      {
+        const passwordInputEl = document.getElementById('password-input');
+        const passwordToggleEl = document.getElementById('password-toggle');
+        if (passwordToggleEl && passwordInputEl) {
+          passwordToggleEl.addEventListener('click', () => {
+            const hidden = passwordInputEl.type === 'password';
+            passwordInputEl.type = hidden ? 'text' : 'password';
+            const icon = passwordToggleEl.querySelector('i');
+            if (icon) {
+              icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
+              if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+              }
             }
-          }
-        });
+          });
+        }
       }
 
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
