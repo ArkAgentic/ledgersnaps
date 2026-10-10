@@ -1004,7 +1004,9 @@ async def auth_signup(
         raise HTTPException(status_code=409, detail="email_already_registered")
     if get_user_by_phone(phone_e164):
         raise HTTPException(status_code=409, detail="phone_already_registered")
-
+    existing_pending = get_latest_pending_signup_by_email(email_norm, status="pending")
+    if existing_pending:
+        raise HTTPException(status_code=409, detail="email_verification_pending")
 
     signup_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
