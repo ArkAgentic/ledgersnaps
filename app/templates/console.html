@@ -177,7 +177,8 @@
 
 
       function authHeaders() {
-        const token = localStorage.getItem('ledgersnaps_dev_token') || localStorage.getItem('authToken') || localStorage.getItem('token') || '';
+        const cookieToken = ((document.cookie || '').split('; ').find(x => x.startsWith('ledgersnaps_dev_token=')) || '').split('=').slice(1).join('=');
+        const token = localStorage.getItem('ledgersnaps_dev_token') || localStorage.getItem('authToken') || localStorage.getItem('token') || decodeURIComponent(cookieToken || '');
         return token ? { 'Authorization': `Bearer ${token}` } : {};
       }
 
@@ -216,14 +217,14 @@
         const slice = jobsCache.slice(start, start + JOBS_PAGE_SIZE);
 
         if (!slice.length) {
-          container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
+          container.innerHTML = `<div class="text-gray-500">${(localStorage.getItem(LANG_KEY)==='zh') ? '暂无任务' : 'No jobs yet'}</div>`;
         } else {
           container.innerHTML = slice.map(j => {
             const status = (j.status || '-').toUpperCase();
             const t = String(j.updated_at || j.created_at || '').slice(0,19).replace('T',' ');
             const fc = j.file_count || 0;
             const ie = j.invoice_estimated || 0;
-            return `<div class="flex items-center justify-between rounded-lg border border-gray-200 p-3"><div><div class="font-medium text-gray-800">${j.job_id}</div><div class="text-xs text-gray-500">files ${fc} · invoices est ${ie}</div></div><div class="text-right"><div class="text-xs font-semibold text-gray-700">${status}</div><div class="text-xs text-gray-500">${t}</div></div></div>`;
+            return `<div class="flex items-center justify-between rounded-lg border border-gray-200 p-3"><div><div class="font-medium text-gray-800">${j.job_id}</div><div class="text-xs text-gray-500">${(localStorage.getItem(LANG_KEY)==='zh') ? `文件 ${fc} · 预估发票 ${ie}` : `files ${fc} · invoices est ${ie}`}</div></div><div class="text-right"><div class="text-xs font-semibold text-gray-700">${status}</div><div class="text-xs text-gray-500">${t}</div></div></div>`;
           }).join('');
         }
 
@@ -266,10 +267,12 @@
             const trial = a.trial || {};
             const plan = a.plan || {};
             const top = a.topup || {};
-            text('kpi-plan', humanPlan(a.plan_id));
-            text('kpi-plan-sub', a.plan_id === 'none' ? `Trial ends: ${String(trial.ends_at || '-').slice(0,10)}` : `Monthly quota: ${plan.invoice_limit || 0}`);
+            const zh = (localStorage.getItem(LANG_KEY) === 'zh');
+            const planLabel = a.plan_id === 'starter_14_95' ? (zh ? '基础版' : 'Starter') : a.plan_id === 'pro_29_95' ? (zh ? '高级版' : 'Pro') : (zh ? '试用' : 'Trial');
+            text('kpi-plan', planLabel);
+            text('kpi-plan-sub', a.plan_id === 'none' ? (zh ? `试用到期：${String(trial.ends_at || '-').slice(0,10)}` : `Trial ends: ${String(trial.ends_at || '-').slice(0,10)}`) : (zh ? `月额度：${plan.invoice_limit || 0}` : `Monthly quota: ${plan.invoice_limit || 0}`));
             text('kpi-ai-remaining', String(a.remaining_invoices ?? 0));
-            text('kpi-ai-sub', `Trial ${trial.remaining_invoices || 0} · Plan ${plan.remaining_invoices || 0} · Top-up ${top.remaining_invoices || 0} remaining`);
+            text('kpi-ai-sub', zh ? `试用 ${trial.remaining_invoices || 0} · 月度 ${plan.remaining_invoices || 0} · 充值 ${top.remaining_invoices || 0} 剩余` : `Trial ${trial.remaining_invoices || 0} · Plan ${plan.remaining_invoices || 0} · Top-up ${top.remaining_invoices || 0} remaining`);
             text('trial-row', `${trial.remaining_invoices || 0} / ${trial.invoice_limit || 0}`);
             text('plan-row', `${plan.remaining_invoices || 0} / ${plan.invoice_limit || 0}`);
             text('topup-row', `${top.remaining_invoices || 0} / ${top.total_invoices || 0}`);
@@ -280,29 +283,32 @@
 
           if (xero) {
             const connected = !!xero.connected;
-            text('kpi-xero', connected ? 'Connected' : 'Not Connected');
+            const zh = (localStorage.getItem(LANG_KEY) === 'zh');
+            text('kpi-xero', connected ? (zh ? '已连接' : 'Connected') : (zh ? '未连接' : 'Not Connected'));
             const tenant = xero.active_tenant_name || xero.active_tenant_id || '-';
             text('kpi-xero-sub', connected ? tenant : '');
             if (xeroConnectBtn) xeroConnectBtn.classList.toggle('hidden', connected);
           }
 
           // MYOB connection endpoint not live yet: show connect CTA by default
-          text('kpi-myob', 'Not Connected');
+          const zh2 = (localStorage.getItem(LANG_KEY) === 'zh');
+          text('kpi-myob', zh2 ? '未连接' : 'Not Connected');
           text('kpi-myob-sub', '');
           if (myobConnectBtn) myobConnectBtn.classList.remove('hidden');
 
           if (jobs) {
             const list = Array.isArray(jobs.jobs) ? jobs.jobs : [];
-            text('recent-count', `${list.length} total`);
+            const zh3 = (localStorage.getItem(LANG_KEY) === 'zh');
+            text('recent-count', zh3 ? `${list.length} 条` : `${list.length} total`);
             jobsCache = list;
             jobsPage = 1;
             renderRecentJobs();
             applyLanguage(localStorage.getItem(LANG_KEY) === 'zh' ? 'zh' : 'en');
           }
         } catch (e) {
-          text('kpi-plan-sub', 'Failed to load live data');
+          text('kpi-plan-sub', (localStorage.getItem(LANG_KEY)==='zh') ? '未读取到账户数据' : 'Failed to load account data');
           const container = document.getElementById('recent-jobs');
-          if (container) container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
+          if (container) container.innerHTML = `<div class="text-gray-500">${(localStorage.getItem(LANG_KEY)==='zh') ? '暂无任务' : 'No jobs yet'}</div>`;
         }
       }
 
