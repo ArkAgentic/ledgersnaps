@@ -86,7 +86,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 justify-items-center">
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <i data-lucide="badge-check" class="h-5 w-5 text-blue-600"></i>
+              <i data-lucide="shield-check" class="h-5 w-5 text-blue-600"></i>
             </div>
             <h3 id="kpi-plan-title" class="font-medium text-gray-600 mb-1">Account Level</h3>
             <p id="kpi-plan" class="text-2xl font-bold text-gray-900">-</p>
@@ -95,7 +95,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <i data-lucide="sparkles" class="h-5 w-5 text-green-600"></i>
+              <i data-lucide="file-search" class="h-5 w-5 text-green-600"></i>
             </div>
             <h3 id="kpi-ai-title" class="font-medium text-gray-600 mb-1">AI Extraction Remaining</h3>
             <p id="kpi-ai-remaining" class="text-2xl font-bold text-gray-900">-</p>
@@ -104,7 +104,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <i data-lucide="link" class="h-5 w-5 text-purple-600"></i>
+              <i data-lucide="plug-zap" class="h-5 w-5 text-purple-600"></i>
             </div>
             <h3 id="kpi-xero-title" class="font-medium text-gray-600 mb-1">Xero Connection</h3>
             <p id="kpi-xero" class="text-2xl font-bold text-gray-900">-</p>
@@ -113,7 +113,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <i data-lucide="plug-zap" class="h-5 w-5 text-orange-600"></i>
+              <i data-lucide="plug-zap" class="h-5 w-5 text-indigo-600"></i>
             </div>
             <h3 id="kpi-myob-title" class="font-medium text-gray-600 mb-1">MYOB Connection</h3>
             <p id="kpi-myob" class="text-2xl font-bold text-gray-900">-</p>
@@ -121,7 +121,8 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm mb-8">
+        <div class="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 id="quota-title" class="text-lg font-semibold text-gray-900 mb-4">Quota Allocation</h3>
           <div class="space-y-4">
             <div class="flex justify-between items-center"><span id="trial-label" class="text-sm text-gray-600">Trial Amount</span><span id="trial-row" class="text-sm font-medium text-gray-900">-</span></div>
@@ -135,6 +136,9 @@
 
             <div class="flex justify-end"><span id="quota-total" class="text-sm text-gray-500">-</span></div>
           </div>
+          </div>
+          <div></div>
+        </div>
         </div>
 
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -143,7 +147,12 @@
             <span id="recent-count" class="text-sm text-gray-500">-</span>
           </div>
           <div id="recent-jobs" class="space-y-3 text-sm text-gray-700">
-            <div class="text-gray-500">Loading live data...</div>
+            <div class="text-gray-500">No jobs yet</div>
+          </div>
+          <div class="mt-4 flex items-center justify-end gap-2">
+            <button id="jobs-prev" class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50">Prev</button>
+            <span id="jobs-page" class="text-xs text-gray-500">1 / 1</span>
+            <button id="jobs-next" class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50">Next</button>
           </div>
         </div>
         </div>
@@ -160,6 +169,10 @@
       const sidebarLogo = document.getElementById('sidebar-logo');
       const signoutLabel = document.getElementById('signout-label');
       const LANG_KEY = 'ledgersnaps_console_lang';
+      const JOBS_PAGE_SIZE = 10;
+      let jobsPage = 1;
+      let jobsCache = [];
+
 
       function authHeaders() {
         const token = localStorage.getItem('ledgersnaps_dev_token') || localStorage.getItem('authToken') || localStorage.getItem('token') || '';
@@ -183,6 +196,38 @@
         const el = document.getElementById(id);
         if (!el) return;
         el.style.width = `${pct(used,total)}%`;
+      }
+
+      function renderRecentJobs() {
+        const container = document.getElementById('recent-jobs');
+        const pageEl = document.getElementById('jobs-page');
+        const prevBtn = document.getElementById('jobs-prev');
+        const nextBtn = document.getElementById('jobs-next');
+        if (!container) return;
+
+        const total = jobsCache.length;
+        const totalPages = Math.max(1, Math.ceil(total / JOBS_PAGE_SIZE));
+        if (jobsPage > totalPages) jobsPage = totalPages;
+        if (jobsPage < 1) jobsPage = 1;
+
+        const start = (jobsPage - 1) * JOBS_PAGE_SIZE;
+        const slice = jobsCache.slice(start, start + JOBS_PAGE_SIZE);
+
+        if (!slice.length) {
+          container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
+        } else {
+          container.innerHTML = slice.map(j => {
+            const status = (j.status || '-').toUpperCase();
+            const t = String(j.updated_at || j.created_at || '').slice(0,19).replace('T',' ');
+            const fc = j.file_count || 0;
+            const ie = j.invoice_estimated || 0;
+            return `<div class="flex items-center justify-between rounded-lg border border-gray-200 p-3"><div><div class="font-medium text-gray-800">${j.job_id}</div><div class="text-xs text-gray-500">files ${fc} · invoices est ${ie}</div></div><div class="text-right"><div class="text-xs font-semibold text-gray-700">${status}</div><div class="text-xs text-gray-500">${t}</div></div></div>`;
+          }).join('');
+        }
+
+        if (pageEl) pageEl.textContent = `${jobsPage} / ${totalPages}`;
+        if (prevBtn) prevBtn.disabled = jobsPage <= 1;
+        if (nextBtn) nextBtn.disabled = jobsPage >= totalPages;
       }
 
       function humanPlan(planId) {
@@ -234,25 +279,14 @@
             text('kpi-myob', 'Not Connected');
             text('kpi-myob-sub', 'Configure in Settings');
             text('recent-count', `${list.length} total`);
-            const container = document.getElementById('recent-jobs');
-            if (container) {
-              if (!list.length) {
-                container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
-              } else {
-                container.innerHTML = list.slice(0,5).map(j => {
-                  const status = (j.status || '-').toUpperCase();
-                  const t = String(j.updated_at || j.created_at || '').slice(0,19).replace('T',' ');
-                  const fc = j.file_count || 0;
-                  const ie = j.invoice_estimated || 0;
-                  return `<div class="flex items-center justify-between rounded-lg border border-gray-200 p-3"><div><div class="font-medium text-gray-800">${j.job_id}</div><div class="text-xs text-gray-500">files ${fc} · invoices est ${ie}</div></div><div class="text-right"><div class="text-xs font-semibold text-gray-700">${status}</div><div class="text-xs text-gray-500">${t}</div></div></div>`;
-                }).join('');
-              }
-            }
+            jobsCache = list;
+            jobsPage = 1;
+            renderRecentJobs();
           }
         } catch (e) {
           text('kpi-plan-sub', 'Failed to load live data');
           const container = document.getElementById('recent-jobs');
-          if (container) container.innerHTML = '<div class="text-red-500">Failed to load jobs</div>';
+          if (container) container.innerHTML = '<div class="text-gray-500">No jobs yet</div>';
         }
       }
 
@@ -341,6 +375,11 @@
       applyTheme();
       applyLanguage(localStorage.getItem(LANG_KEY) === 'zh' ? 'zh' : 'en');
       loadOverview();
+      const prevBtn = document.getElementById('jobs-prev');
+      const nextBtn = document.getElementById('jobs-next');
+      if (prevBtn) prevBtn.addEventListener('click', () => { jobsPage -= 1; renderRecentJobs(); });
+      if (nextBtn) nextBtn.addEventListener('click', () => { jobsPage += 1; renderRecentJobs(); });
+
       if (langToggle) {
         langToggle.addEventListener('click', () => {
           const next = (localStorage.getItem(LANG_KEY) === 'zh') ? 'en' : 'zh';
