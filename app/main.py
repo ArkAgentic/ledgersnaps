@@ -456,7 +456,18 @@ async def pricing_page() -> HTMLResponse:
 
 
 @app.get("/console", response_class=HTMLResponse)
-async def console_page() -> HTMLResponse:
+async def console_page(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+) -> HTMLResponse | RedirectResponse:
+    # Console page requires authenticated user.
+    # Browser navigation normally carries token in cookie, API calls carry Bearer.
+    dev_token = request.cookies.get("ledgersnaps_dev_token") or request.headers.get("X-Dev-Token")
+    try:
+        _ = resolve_current_user(credentials, None, dev_token)
+    except HTTPException:
+        return RedirectResponse(url="/", status_code=307)
+
     response = _render_template_or_500("console.html", "console_template_missing")
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
