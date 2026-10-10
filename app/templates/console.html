@@ -104,7 +104,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <i data-lucide="building-2" class="h-5 w-5" style="color:#13B5EA"></i>
+              <i data-lucide="link-2" class="h-5 w-5" style="color:#13B5EA"></i>
             </div>
             <h3 id="kpi-xero-title" class="font-medium text-gray-600 mb-1">Xero Connection</h3>
             <p id="kpi-xero" class="text-2xl font-bold text-gray-900">Not Connected</p>
@@ -114,7 +114,7 @@
 
           <div class="w-full max-w-[270px] p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
-              <i data-lucide="briefcase-business" class="h-5 w-5 text-purple-600"></i>
+              <i data-lucide="link-2" class="h-5 w-5 text-purple-600"></i>
             </div>
             <h3 id="kpi-myob-title" class="font-medium text-gray-600 mb-1">MYOB Connection</h3>
             <p id="kpi-myob" class="text-2xl font-bold text-gray-900">Not Connected</p>
@@ -228,8 +228,18 @@
         }
 
         if (pageEl) pageEl.textContent = `${jobsPage} / ${totalPages}`;
-        if (prevBtn) prevBtn.disabled = jobsPage <= 1;
-        if (nextBtn) nextBtn.disabled = jobsPage >= totalPages;
+        if (prevBtn) {
+          prevBtn.disabled = jobsPage <= 1;
+          prevBtn.classList.toggle('hidden', totalPages <= 1);
+          prevBtn.classList.toggle('opacity-40', jobsPage <= 1);
+          prevBtn.classList.toggle('cursor-not-allowed', jobsPage <= 1);
+        }
+        if (nextBtn) {
+          nextBtn.disabled = jobsPage >= totalPages;
+          nextBtn.classList.toggle('hidden', totalPages <= 1);
+          nextBtn.classList.toggle('opacity-40', jobsPage >= totalPages);
+          nextBtn.classList.toggle('cursor-not-allowed', jobsPage >= totalPages);
+        }
       }
 
       function humanPlan(planId) {
@@ -287,6 +297,7 @@
             jobsCache = list;
             jobsPage = 1;
             renderRecentJobs();
+            applyLanguage(localStorage.getItem(LANG_KEY) === 'zh' ? 'zh' : 'en');
           }
         } catch (e) {
           text('kpi-plan-sub', 'Failed to load live data');
@@ -328,7 +339,10 @@
           'Top-up':'充值额度',
           'Recent Processing Jobs':'最近处理任务',
           'Connected':'已连接',
-          'Not Connected':'未连接'
+          'Not Connected':'未连接',
+          'MYOB Coming Soon':'MYOB 即将接入',
+          'Prev':'上一页',
+          'Next':'下一页'
         } : {
           'Overview':'Overview',
           'Upload & Extract':'Upload & Extract',
@@ -353,7 +367,10 @@
           'Top-up':'Top-up Amount',
           'Recent Processing Jobs':'Recent Processing Jobs',
           'Connected':'Connected',
-          'Not Connected':'Not Connected'
+          'Not Connected':'Not Connected',
+          'MYOB Coming Soon':'MYOB connect coming soon',
+          'Prev':'Prev',
+          'Next':'Next'
         };
 
         document.querySelectorAll('.menu-option').forEach((btn) => {
@@ -375,6 +392,10 @@
         text('kpi-myob-title', map['MYOB Connection']);
         if (xeroConnectBtn) xeroConnectBtn.textContent = map['Connect'];
         if (myobConnectBtn) myobConnectBtn.textContent = map['Connect'];
+        const prevBtn = document.getElementById('jobs-prev');
+        const nextBtn = document.getElementById('jobs-next');
+        if (prevBtn) prevBtn.textContent = map['Prev'];
+        if (nextBtn) nextBtn.textContent = map['Next'];
         text('quota-title', map['Quota Allocation']);
         text('trial-label', map['Trial']);
         text('plan-label', map['Plan']);
@@ -408,7 +429,8 @@
       }
       if (myobConnectBtn) {
         myobConnectBtn.addEventListener('click', () => {
-          text('kpi-myob-sub', 'MYOB connect coming soon');
+          const zh = (localStorage.getItem(LANG_KEY) === 'zh');
+          text('kpi-myob-sub', zh ? 'MYOB 即将接入' : 'MYOB connect coming soon');
         });
       }
 
