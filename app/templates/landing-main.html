@@ -166,7 +166,12 @@
             </div>
             <div id="password-row">
               <label class="text-sm text-neutral-700 block" data-i18n="password">Password</label>
-              <input id="password-input" type="password" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          <div class="relative mt-1">
+              <input id="password-input" type="password" class="w-full h-11 rounded-xl border border-neutral-300 px-3 pr-11 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+              <button type="button" id="password-toggle" class="absolute inset-y-0 right-2 my-auto h-7 w-7 grid place-content-center text-neutral-500 hover:text-neutral-800" aria-label="Toggle password visibility">
+                <i data-lucide="eye" class="h-4 w-4"></i>
+              </button>
+            </div>
             </div>
           </div>
 
@@ -402,6 +407,7 @@
           const email = (document.getElementById('email-input') || {}).value || '';
           const password = (document.getElementById('password-input') || {}).value || '';
           const statusEl = document.getElementById('auth-status');
+          if (statusEl) statusEl.textContent = '';
           try {
             const q = new URLSearchParams({ email: String(email).trim(), password: String(password) });
             const r = await fetch('/api/v1/auth/signin/local?' + q.toString(), { method: 'POST' });
@@ -413,7 +419,32 @@
             document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
             window.location.href = j.redirect || '/console';
           } catch (e) {
-            if (statusEl) statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '登录失败：' : 'Sign-in failed: ') + String(e.message || e);
+            const msg = String(e.message || e || 'signin_failed');
+            if (statusEl) {
+              statusEl.classList.remove('status-success');
+              statusEl.classList.add('status-error');
+              if (msg.includes('invalid_credentials')) {
+                statusEl.textContent = document.documentElement.lang === 'zh-CN'
+                  ? '邮箱或密码不正确，请重试。'
+                  : 'Email or password is incorrect. Please try again.';
+              } else {
+                statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '登录失败：' : 'Sign-in failed: ') + msg;
+              }
+            }
+          }
+        });
+      }
+
+      if (passwordToggle && passwordInput) {
+        passwordToggle.addEventListener('click', () => {
+          const hidden = passwordInput.type === 'password';
+          passwordInput.type = hidden ? 'text' : 'password';
+          const icon = passwordToggle.querySelector('i');
+          if (icon) {
+            icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons();
+            }
           }
         });
       }
@@ -442,6 +473,8 @@
       const signinFields = document.getElementById('signin-fields');
       const passwordRow = document.getElementById('password-row');
       const signInBtn = document.getElementById('btn-signin');
+      const passwordInput = document.getElementById('password-input');
+      const passwordToggle = document.getElementById('password-toggle');
       const signupCta = document.getElementById('signup-cta');
       const resetStatus = document.getElementById('reset-status');
       const createStatus = document.getElementById('create-status');
