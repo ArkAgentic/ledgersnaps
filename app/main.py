@@ -459,7 +459,7 @@ async def pricing_page() -> HTMLResponse:
 async def console_page(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     # Console page requires authenticated user.
     # Browser navigation normally carries token in cookie, API calls carry Bearer.
     dev_token = request.cookies.get("ledgersnaps_dev_token") or request.headers.get("X-Dev-Token")
