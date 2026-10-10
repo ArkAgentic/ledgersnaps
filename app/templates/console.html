@@ -246,11 +246,22 @@
 
       async function loadOverview() {
         try {
+          const headers = authHeaders();
+          if (!headers.Authorization) {
+            window.location.href = '/';
+            return;
+          }
+
           const [billingRes, xeroRes, jobsRes] = await Promise.all([
-            fetch('/api/v1/billing/me', { headers: authHeaders() }),
-            fetch('/api/v1/xero/connection', { headers: authHeaders() }),
-            fetch('/api/v1/jobs', { headers: authHeaders() }),
+            fetch('/api/v1/billing/me', { headers }),
+            fetch('/api/v1/xero/connection', { headers }),
+            fetch('/api/v1/jobs', { headers }),
           ]);
+
+          if (billingRes.status === 401 || jobsRes.status === 401 || xeroRes.status === 401) {
+            window.location.href = '/';
+            return;
+          }
 
           const billing = billingRes.ok ? await billingRes.json() : null;
           const xero = xeroRes.ok ? await xeroRes.json() : null;
