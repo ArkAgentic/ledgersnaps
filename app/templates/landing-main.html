@@ -1057,5 +1057,102 @@
     })();
   </script>
 
+  <script>
+    // Resilient fallback handlers: keep auth buttons usable even if main script errors.
+    (() => {
+      function panel(id, show) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('hidden', !show);
+      }
+      function showSignIn() {
+        panel('signin-combined', true);
+        panel('reset-panel', false);
+        panel('create-account-panel', false);
+        panel('verify-code-panel', false);
+      }
+      function showReset() {
+        panel('signin-combined', false);
+        panel('reset-panel', true);
+        panel('create-account-panel', false);
+        panel('verify-code-panel', false);
+      }
+      function showCreate() {
+        panel('signin-combined', false);
+        panel('reset-panel', false);
+        panel('create-account-panel', true);
+        panel('verify-code-panel', false);
+      }
+
+      async function doSignIn() {
+        const email = (document.getElementById('email-input') || {}).value || '';
+        const password = (document.getElementById('password-input') || {}).value || '';
+        const statusEl = document.getElementById('auth-status');
+        const btn = document.getElementById('btn-signin');
+        if (statusEl) statusEl.textContent = '';
+        if (btn) { btn.disabled = true; btn.classList.add('opacity-60','cursor-not-allowed'); }
+        try {
+          const q = new URLSearchParams({ email: String(email).trim(), password: String(password) });
+          const r = await fetch('/api/v1/auth/signin/local?' + q.toString(), { method: 'POST' });
+          const raw = await r.text();
+          let j = {};
+          try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = { detail: raw || 'signin_failed' }; }
+          if (!r.ok || !j.token) throw new Error((j && j.detail) ? j.detail : ('http_' + r.status));
+          try { localStorage.setItem('ledgersnaps_dev_token', j.token); } catch(e) {}
+          document.cookie = 'ledgersnaps_dev_token='+encodeURIComponent(j.token)+'; path=/; max-age='+(24*3600)+'; samesite=lax';
+          window.location.href = j.redirect || '/console';
+        } catch (e) {
+          if (statusEl) {
+            const zh = document.documentElement.lang === 'zh-CN';
+            const msg = String((e && e.message) || e || 'signin_failed');
+            statusEl.textContent = msg.includes('invalid_credentials')
+              ? (zh ? '邮箱或密码不正确，请重试。' : 'Email or password is incorrect. Please try again.')
+              : (zh ? '登录失败：' : 'Sign-in failed: ') + msg;
+          }
+        } finally {
+          if (btn) { btn.disabled = false; btn.classList.remove('opacity-60','cursor-not-allowed'); }
+        }
+      }
+
+      async function doForgot() {
+        const email = (document.getElementById('reset-email-input') || {}).value || '';
+        const statusEl = document.getElementById('reset-status');
+        const btn = document.getElementById('btn-send-reset');
+        if (!email.trim()) {
+          if (statusEl) statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '请输入邮箱。' : 'Please enter your email.');
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.classList.add('opacity-60','cursor-not-allowed'); }
+        try {
+          const q = new URLSearchParams({ email: String(email).trim() });
+          const r = await fetch('/api/v1/auth/password/forgot?' + q.toString(), { method: 'POST' });
+          const raw = await r.text();
+          let j = {};
+          try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = {}; }
+          if (!r.ok) throw new Error((j && j.detail) ? j.detail : ('http_' + r.status));
+          if (statusEl) {
+            statusEl.textContent = document.documentElement.lang === 'zh-CN'
+              ? '如果该邮箱已注册，我们已发送重置方式。'
+              : 'If this email is registered, we have sent reset instructions.';
+          }
+        } catch (e) {
+          if (statusEl) statusEl.textContent = (document.documentElement.lang === 'zh-CN' ? '发送失败：' : 'Send failed: ') + String((e && e.message) || e);
+        } finally {
+          if (btn) { btn.disabled = false; btn.classList.remove('opacity-60','cursor-not-allowed'); }
+        }
+      }
+
+      document.addEventListener('click', (ev) => {
+        const t = ev.target && ev.target.closest ? ev.target.closest('button, a') : null;
+        if (!t) return;
+        if (t.id === 'btn-signin') { ev.preventDefault(); doSignIn(); }
+        if (t.id === 'forgot-password-link') { ev.preventDefault(); showReset(); }
+        if (t.id === 'start-trial-link') { ev.preventDefault(); showCreate(); }
+        if (t.id === 'back-to-signin' || t.id === 'back-from-create' || t.id === 'back-from-verify') { ev.preventDefault(); showSignIn(); }
+        if (t.id === 'btn-send-reset') { ev.preventDefault(); doForgot(); }
+      }, true);
+    })();
+  </script>
+
 </body>
 </html>
