@@ -440,23 +440,8 @@
         });
       }
 
-      {
-        const passwordInputEl = document.getElementById('password-input');
-        const passwordToggleEl = document.getElementById('password-toggle');
-        if (passwordToggleEl && passwordInputEl) {
-          passwordToggleEl.addEventListener('click', () => {
-            const hidden = passwordInputEl.type === 'password';
-            passwordInputEl.type = hidden ? 'text' : 'password';
-            const icon = passwordToggleEl.querySelector('i');
-            if (icon) {
-              icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
-              if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                window.lucide.createIcons();
-              }
-            }
-          });
-        }
-      }
+      // Password toggle is handled in the hardened fallback listener below
+      // to avoid duplicate handlers toggling twice.
 
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
@@ -1124,7 +1109,19 @@
       }, true);
       const pt=el('password-toggle'); const pi=el('password-input');
       if(pt && pi){
-        pt.addEventListener('click', ()=>{ pi.type = (pi.type==='password') ? 'text' : 'password'; }, true);
+        pt.addEventListener('click', ()=>{
+          const hidden = pi.type === 'password';
+          pi.type = hidden ? 'text' : 'password';
+          const icon = pt.querySelector('i, svg');
+          if (icon) {
+            const iconName = hidden ? 'eye-off' : 'eye';
+            icon.setAttribute('data-lucide', iconName);
+            icon.setAttribute('aria-label', iconName === 'eye-off' ? 'Hide password' : 'Show password');
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons();
+            }
+          }
+        }, true);
       }
     })();
   </script>

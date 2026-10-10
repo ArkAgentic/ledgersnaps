@@ -1,4 +1,5 @@
 from io import BytesIO
+import logging
 import os
 import re
 import secrets
@@ -83,6 +84,8 @@ from .xero_oauth import (
     set_active_tenant,
 )
 from .xero_payload_validator import validate_xero_draft_payload
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LedgerSnaps API", version="0.4.1")
 
@@ -1281,9 +1284,9 @@ async def auth_password_forgot(
         scheme = (request.url.scheme if request else "https") or "https"
         reset_link = f"{scheme}://{host}/reset-password?token={raw_token}"
         send_password_reset_email(to_email=str(user.get("email") or email_norm), reset_link=reset_link)
-    except Exception:
-        # keep outward response non-enumerating
-        pass
+    except Exception as e:
+        # keep outward response non-enumerating, but preserve server-side diagnostics
+        logger.exception("password_reset_email_send_failed", extra={"email": email_norm, "error": str(e)})
 
     resp = {"ok": True, "status": "accepted"}
     if os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower() == "dev":
