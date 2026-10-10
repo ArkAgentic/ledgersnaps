@@ -1271,10 +1271,12 @@ async def auth_password_forgot(
         return {"ok": True, "status": "accepted"}
     # Always return generic response to avoid account enumeration.
     if not user:
+        print("PASSWORD_RESET_TRACE unknown_email")
         logger.info("password_reset_requested_for_unknown_email")
         return {"ok": True, "status": "accepted"}
 
     raw_token = secrets.token_urlsafe(24)
+    print("PASSWORD_RESET_TRACE existing_email")
     logger.info("password_reset_requested_for_existing_email")
     token_hash = _sha256_hex(raw_token)
     expires_at = (datetime.utcnow() + timedelta(minutes=20)).isoformat()
@@ -1286,8 +1288,10 @@ async def auth_password_forgot(
         scheme = (request.url.scheme if request else "https") or "https"
         reset_link = f"{scheme}://{host}/reset-password?token={raw_token}"
         send_password_reset_email(to_email=str(user.get("email") or email_norm), reset_link=reset_link)
+        print("PASSWORD_RESET_TRACE send_success")
         logger.info("password_reset_email_send_success")
     except Exception as e:
+        print(f"PASSWORD_RESET_TRACE send_failed {type(e).__name__}: {e}")
         # keep outward response non-enumerating, but preserve server-side diagnostics
         logger.exception("password_reset_email_send_failed", extra={"email": email_norm, "error": str(e)})
 
