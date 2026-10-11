@@ -89,15 +89,20 @@ def _send_email(
     raise RuntimeError(f"unsupported_reset_email_provider:{provider}")
 
 
-def send_password_reset_email(*, to_email: str, reset_link: str) -> None:
+def send_password_reset_email(*, to_email: str, reset_link: str | None = None, verify_code: str | None = None) -> None:
+    html_body = render_signup_verification_email_html(verify_code=str(verify_code or "").strip()) if verify_code else None
+    plain_text = (
+        "Hi there,\n\n"
+        "You requested to reset your LedgerSnaps password.\n"
+        + (f"Your 6-digit verification code is: {verify_code}\n\n" if verify_code else f"Reset link: {reset_link}\n\n")
+        + "If you did not request this, you can ignore this email."
+    )
     _send_email(
         to_email=to_email,
-        subject="LedgerSnaps password reset",
-        body_text=(
-            "You requested to reset your LedgerSnaps password.\n\n"
-            f"Reset link: {reset_link}\n\n"
-            "If you did not request this, you can ignore this email."
-        ),
+        subject="Your LedgerSnaps verification code",
+        body_text=plain_text,
+        body_html=html_body,
+        headers=_signup_headers(to_email),
     )
 
 

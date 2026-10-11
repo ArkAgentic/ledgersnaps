@@ -1499,6 +1499,37 @@ def get_password_reset_token(token_hash: str) -> Optional[dict[str, Any]]:
     row = cur.fetchone()
     return dict(row) if row else None
 
+
+def get_latest_password_reset_token_by_user(user_id: str, *, status: str = "pending") -> Optional[dict[str, Any]]:
+    if _pg_enabled():
+        conn = _ensure_pg_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT token_hash, user_id, expires_at, status, created_at, used_at
+                FROM password_reset_tokens
+                WHERE user_id=%s AND status=%s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (user_id, status),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+    conn = _ensure_conn()
+    cur = conn.execute(
+        """
+        SELECT token_hash, user_id, expires_at, status, created_at, used_at
+        FROM password_reset_tokens
+        WHERE user_id=? AND status=?
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (user_id, status),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
 def mark_password_reset_token_used(token_hash: str) -> None:
     now = _now_iso()
     if _pg_enabled():

@@ -50,6 +50,7 @@ from .store import (
     delete_xero_connection,
     get_oauth_identity,
     get_password_reset_token,
+    get_latest_password_reset_token_by_user,
     get_pending_signup_token,
     get_latest_pending_signup_by_email,
     get_user_by_email,
@@ -1284,19 +1285,29 @@ async def auth_password_forgot(
         logger.info("password_reset_requested_for_unknown_email")
         return {"ok": True, "status": "accepted"}
 
+    existing_pending = get_latest_password_reset_token_by_user(str(user.get("user_id") or ""), status="pending")
+    if existing_pending:
+        created_at = str(existing_pending.get("created_at") or "")
+        try:
+            if created_at:
+                created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                now_dt = datetime.now(created_dt.tzinfo) if created_dt.tzinfo else datetime.utcnow()
+                if (now_dt - created_dt).total_seconds() < 30:
+                    return {"ok": True, "status": "accepted"}
+        except ValueError:
+            pass
+
     raw_token = secrets.token_urlsafe(24)
     print("PASSWORD_RESET_TRACE existing_email")
     logger.info("password_reset_requested_for_existing_email")
     token_hash = _sha256_hex(raw_token)
     expires_at = (datetime.utcnow() + timedelta(minutes=20)).isoformat()
     create_password_reset_token(token_hash=token_hash, user_id=str(user.get("user_id")), expires_at=expires_at)
+    verify_code = f"{int(token_hash[:12], 16) % 1000000:06d}"
 
-    # Send via email when account exists; keep response generic.
+    # Send verification code email when account exists; keep response generic.
     try:
-        host = (request.headers.get("host") if request else "") or "ledgersnaps.com"
-        scheme = (request.url.scheme if request else "https") or "https"
-        reset_link = f"{scheme}://{host}/reset-password?token={raw_token}"
-        send_password_reset_email(to_email=str(user.get("email") or email_norm), reset_link=reset_link)
+        send_password_reset_email(to_email=str(user.get("email") or email_norm), verify_code=verify_code)
         print("PASSWORD_RESET_TRACE send_success")
         logger.info("password_reset_email_send_success")
     except Exception as e:
@@ -1308,34 +1319,45 @@ async def auth_password_forgot(
     if os.getenv("RESET_EMAIL_PROVIDER", "dev").strip().lower() == "dev":
         # local dev visibility only
         resp["dev_reset_token"] = raw_token
+        resp["dev_reset_code"] = verify_code
     return resp
 
 
-@app.post("/api/v1/auth/password/reset")
-async def auth_password_reset(
-    reset_token: str = Query(..., min_length=12),
+@app.post("/api/v1/auth/password/reset/verify-code")
+async def auth_password_reset_verify_code(
+    email: str = Query(..., min_length=3),
+    code: str = Query(..., min_length=6, max_length=6),
     new_password: str = Query(..., min_length=8),
 ) -> dict:
-    token_hash = _sha256_hex(reset_token)
-    rec = get_password_reset_token(token_hash)
-    if not rec or str(rec.get("status")) != "pending":
-        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+    email_norm = str(email or "").strip().lower()
+    user = get_user_by_email(email_norm)
+    if not user:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_code")
 
-    exp = str(rec.get("expires_at") or "")
+    # password policy: at least 8 chars, include letters and numbers
+    if len(new_password) < 8 or not re.search(r"[A-Za-z]", new_password) or not re.search(r"\d", new_password):
+        raise HTTPException(status_code=400, detail="password_policy_not_met")
+
+    pending = get_latest_password_reset_token_by_user(str(user.get("user_id") or ""), status="pending")
+    if not pending:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_code")
+
+    token_hash = str(pending.get("token_hash") or "")
+    expected_code = f"{int(token_hash[:12], 16) % 1000000:06d}" if token_hash else ""
+    if not expected_code or str(code).strip() != expected_code:
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_code")
+
+    exp = str(pending.get("expires_at") or "")
     if not exp:
-        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_code")
     try:
         if datetime.utcnow() > datetime.fromisoformat(exp):
-            raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+            raise HTTPException(status_code=400, detail="invalid_or_expired_reset_code")
     except ValueError:
-        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
-
-    user_id = str(rec.get("user_id") or "")
-    if not user_id or not get_user_by_id(user_id):
-        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_token")
+        raise HTTPException(status_code=400, detail="invalid_or_expired_reset_code")
 
     salt_hex, digest_hex = _hash_password(new_password)
-    upsert_local_credential(user_id, password_salt=salt_hex, password_hash=digest_hex)
+    upsert_local_credential(str(user.get("user_id")), password_salt=salt_hex, password_hash=digest_hex)
     mark_password_reset_token_used(token_hash)
 
     return {"ok": True, "status": "password_updated"}

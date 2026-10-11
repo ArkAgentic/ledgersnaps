@@ -184,11 +184,40 @@
         </div>
 
         <div id="reset-panel" class="hidden w-[80%] mx-auto">
-          <p class="text-sm text-neutral-600 mb-3" data-i18n="reset_hint">Enter your email to receive a password reset link.</p>
+          <p class="text-sm text-neutral-600 mb-3" data-i18n="reset_hint">Enter your email to receive a 6-digit reset code.</p>
           <input id="reset-email-input" type="email" class="w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
-          <button id="btn-send-reset" class="mt-4 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="send_reset">Send reset link</button>
+          <button id="btn-send-reset" class="mt-4 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="send_reset">Send reset code</button>
           <button type="button" id="back-to-signin" class="block w-full text-center mt-3 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
           <p id="reset-status" class="mt-3 text-sm text-neutral-600"></p>
+        </div>
+
+        <div id="reset-code-panel" class="hidden w-[80%] mx-auto space-y-3">
+          <p class="text-sm text-neutral-600" data-i18n="reset_code_hint">We sent a 6-digit reset code to your email. Enter it to continue.</p>
+          <div class="flex items-center justify-between gap-2">
+            <input class="reset-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="reset-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="reset-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="reset-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="reset-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+            <input class="reset-code-input w-11 h-11 text-center rounded-xl border border-neutral-300 focus:ring-2 focus:ring-neutral-900 focus:outline-none" inputmode="numeric" maxlength="1" />
+          </div>
+          <button id="btn-confirm-reset-code" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="confirm_reset_code">Confirm reset code</button>
+          <button type="button" id="back-from-reset-code" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
+          <p id="reset-code-status" class="text-sm min-h-[20px]"></p>
+        </div>
+
+        <div id="reset-password-panel" class="hidden w-[80%] mx-auto space-y-3">
+          <div>
+            <label class="text-sm text-neutral-700 block" data-i18n="new_password">New Password</label>
+            <input id="reset-new-password-input" type="password" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          </div>
+          <div>
+            <label class="text-sm text-neutral-700 block" data-i18n="confirm_new_password">Confirm New Password</label>
+            <input id="reset-confirm-password-input" type="password" class="mt-1 w-full h-11 rounded-xl border border-neutral-300 px-3 focus:ring-2 focus:ring-neutral-900 focus:outline-none" />
+          </div>
+          <button id="btn-submit-new-password" class="mt-2 w-full h-11 rounded-xl bg-[#E32652] text-white font-normal" data-i18n="submit_new_password">Reset password</button>
+          <button type="button" id="back-from-reset-password" class="block w-full text-center mt-1 text-sm text-neutral-600 hover:text-neutral-800 underline" data-i18n="back_short">Back</button>
+          <p id="reset-password-status" class="text-sm min-h-[20px]"></p>
         </div>
 
         <div id="create-account-panel" class="hidden w-[80%] mx-auto space-y-3">
@@ -269,8 +298,13 @@
           password: 'Password',
           sign_in: 'Sign In',
           forgot_password: 'Forgot password?',
-          reset_hint: 'Enter your email to receive a password reset link.',
-          send_reset: 'Send reset link',
+          reset_hint: 'Enter your email to receive a 6-digit reset code.',
+          send_reset: 'Send reset code',
+          reset_code_hint: 'We sent a 6-digit reset code to your email. Enter it to continue.',
+          confirm_reset_code: 'Confirm reset code',
+          new_password: 'New Password',
+          confirm_new_password: 'Confirm New Password',
+          submit_new_password: 'Reset password',
           back_short: 'Back',
           create_hint: 'Create your account to start your free trial.',
           verify_code_hint: 'We sent a 6-digit code to your email. Enter it to continue.',
@@ -288,7 +322,7 @@
           no_account: 'Don’t have an account yet?',
           start_trial: 'Start your 7-day free trial',
           lang_label: 'English (AU)',
-          copyright: 'LedgerSnaps Inc. © 2026. All rights reserved.||ABN: 92 627 301 153'
+          copyright: 'LedgerSnaps © 2026. All rights reserved.||ABN: 92 627 301 153'
         },
         zh: {
           hero_title: '发票与收据，几秒即可生成 Xero 或 MYOB 草稿账单',
@@ -311,8 +345,13 @@
           password: '密码',
           sign_in: '登录',
           forgot_password: '忘记密码？',
-          reset_hint: '输入你的邮箱，我们会发送重置密码链接。',
-          send_reset: '发送重置链接',
+          reset_hint: '输入你的邮箱，我们会发送 6 位重置验证码。',
+          send_reset: '发送重置验证码',
+          reset_code_hint: '我们已发送 6 位重置验证码到你的邮箱，请输入后继续。',
+          confirm_reset_code: '确认重置验证码',
+          new_password: '新密码',
+          confirm_new_password: '确认新密码',
+          submit_new_password: '重置密码',
           back_short: '返回',
           create_hint: '创建账户以开始你的免费试用。',
           verify_code_hint: '我们已发送 6 位验证码到你的邮箱，请输入后继续。',
@@ -330,7 +369,7 @@
           no_account: '还没有账号吗？',
           start_trial: '开始 7 天免费试用',
           lang_label: '中文 (CN)',
-          copyright: 'LedgerSnaps Inc. © 2026。保留所有权利。||ABN: 92 627 301 153'
+          copyright: 'LedgerSnaps © 2026。保留所有权利。||ABN: 92 627 301 153'
         }
       };
 
@@ -461,11 +500,15 @@
       const backBtn = document.getElementById('back-to-signin');
       const backFromCreateBtn = document.getElementById('back-from-create');
       const backFromVerifyBtn = document.getElementById('back-from-verify');
+      const backFromResetCodeBtn = document.getElementById('back-from-reset-code');
+      const backFromResetPasswordBtn = document.getElementById('back-from-reset-password');
       const signinOauth = document.getElementById('signin-oauth');
       const resetPanel = document.getElementById('reset-panel');
       const signinCombined = document.getElementById('signin-combined');
       const createAccountPanel = document.getElementById('create-account-panel');
       const verifyCodePanel = document.getElementById('verify-code-panel');
+      const resetCodePanel = document.getElementById('reset-code-panel');
+      const resetPasswordPanel = document.getElementById('reset-password-panel');
       const phoneVerifyPanel = null;
       const signinSection = document.getElementById('signin-section');
       const signinFields = document.getElementById('signin-fields');
@@ -477,12 +520,18 @@
       const resetStatus = document.getElementById('reset-status');
       const createStatus = document.getElementById('create-status');
       const verifyStatus = document.getElementById('verify-status');
+      const resetCodeStatus = document.getElementById('reset-code-status');
+      const resetPasswordStatus = document.getElementById('reset-password-status');
       const verifyCodeInputs = Array.from(document.querySelectorAll('.verify-code-input'));
+      const resetCodeInputs = Array.from(document.querySelectorAll('.reset-code-input'));
       const completeRegistrationBtn = document.getElementById('btn-complete-registration');
+      const confirmResetCodeBtn = document.getElementById('btn-confirm-reset-code');
+      const submitNewPasswordBtn = document.getElementById('btn-submit-new-password');
       const completePhoneVerifyBtn = null;
       const resendCodeBtn = document.getElementById('btn-resend-code');
       let resendCooldownTimer = null;
       let resendCooldownRemaining = 0;
+      let resetPendingEmail = '';
 
       function getPanelKindFromPath(path) {
         if (path === '/privacy') return 'privacy';
@@ -500,7 +549,7 @@
       const leftLegalBack = document.getElementById('left-legal-back');
       const leftLegalShell = document.getElementById('left-legal-shell');
 
-      const PANELS = [signinCombined, resetPanel, createAccountPanel, verifyCodePanel, phoneVerifyPanel].filter(Boolean);
+      const PANELS = [signinCombined, resetPanel, createAccountPanel, verifyCodePanel, resetCodePanel, resetPasswordPanel, phoneVerifyPanel].filter(Boolean);
       PANELS.forEach((el) => el.classList.add('auth-panel'));
 
       function switchPanel(targetEl) {
@@ -521,6 +570,14 @@
 
       function showVerifyMode() {
         switchPanel(verifyCodePanel);
+      }
+
+      function showResetCodeMode() {
+        switchPanel(resetCodePanel);
+      }
+
+      function showResetPasswordMode() {
+        switchPanel(resetPasswordPanel);
       }
 
       function setButtonLoading(btn, loading, loadingText) {
@@ -721,6 +778,14 @@
       if (backFromVerifyBtn) backFromVerifyBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showCreateMode();
+      });
+      if (backFromResetCodeBtn) backFromResetCodeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showResetMode();
+      });
+      if (backFromResetPasswordBtn) backFromResetPasswordBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showResetCodeMode();
       });
       if (leftLegalBack) leftLegalBack.addEventListener('click', (e) => {
         e.preventDefault();
@@ -1024,14 +1089,142 @@
           let j = {};
           try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = {}; }
           if (!r.ok) throw new Error((j && j.detail) ? j.detail : ('http_' + r.status));
+          resetPendingEmail = String(email).trim().toLowerCase();
+          resetCodeInputs.forEach((inp, idx) => { inp.value = ''; if (idx === 0) inp.focus(); });
           if (resetStatus) {
-            const base = (document.documentElement.lang === 'zh-CN' ? '如果该邮箱已注册，我们已发送重置方式。' : 'If this email is registered, we have sent reset instructions.');
-            resetStatus.textContent = j.dev_reset_token ? `${base} [dev token: ${j.dev_reset_token}]` : base;
+            resetStatus.classList.remove('status-error', 'status-success');
+            resetStatus.classList.add('status-success');
+            resetStatus.textContent = document.documentElement.lang === 'zh-CN'
+              ? '如果该邮箱已注册，我们已发送 6 位重置验证码。'
+              : 'If this email is registered, we sent a 6-digit reset code.';
           }
+          if (resetCodeStatus) {
+            resetCodeStatus.classList.remove('status-error', 'status-success');
+            resetCodeStatus.textContent = '';
+          }
+          if (resetPasswordStatus) {
+            resetPasswordStatus.classList.remove('status-error', 'status-success');
+            resetPasswordStatus.textContent = '';
+          }
+          showResetCodeMode();
         } catch (e) {
           if (resetStatus) resetStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '发送失败：' : 'Send failed: ') + String(e.message || e);
         } finally {
           if (sendResetBtn) { sendResetBtn.disabled = false; sendResetBtn.classList.remove('opacity-60','cursor-not-allowed'); }
+        }
+      });
+
+      resetCodeInputs.forEach((inp, idx) => {
+        inp.addEventListener('input', () => {
+          inp.value = String(inp.value || '').replace(/\D/g, '').slice(0, 1);
+          if (inp.value && idx < resetCodeInputs.length - 1) resetCodeInputs[idx + 1].focus();
+        });
+        inp.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Backspace' && !inp.value && idx > 0) resetCodeInputs[idx - 1].focus();
+        });
+      });
+
+      if (confirmResetCodeBtn) confirmResetCodeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const code = resetCodeInputs.map((x) => String(x.value || '').trim()).join('');
+        if (!resetPendingEmail) {
+          if (resetCodeStatus) {
+            resetCodeStatus.classList.remove('status-success');
+            resetCodeStatus.classList.add('status-error');
+            resetCodeStatus.textContent = document.documentElement.lang === 'zh-CN'
+              ? '请先输入邮箱并发送验证码。'
+              : 'Please enter your email and request a reset code first.';
+          }
+          return;
+        }
+        if (!/^\d{6}$/.test(code)) {
+          if (resetCodeStatus) {
+            resetCodeStatus.classList.remove('status-success');
+            resetCodeStatus.classList.add('status-error');
+            resetCodeStatus.textContent = document.documentElement.lang === 'zh-CN'
+              ? '请输入 6 位数字验证码。'
+              : 'Please enter a valid 6-digit code.';
+          }
+          return;
+        }
+        if (resetCodeStatus) {
+          resetCodeStatus.classList.remove('status-error');
+          resetCodeStatus.classList.add('status-success');
+          resetCodeStatus.textContent = document.documentElement.lang === 'zh-CN'
+            ? '验证码已确认，请设置新密码。'
+            : 'Code confirmed. Please set a new password.';
+        }
+        showResetPasswordMode();
+      });
+
+      if (submitNewPasswordBtn) submitNewPasswordBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const p1 = (document.getElementById('reset-new-password-input') || {}).value || '';
+        const p2 = (document.getElementById('reset-confirm-password-input') || {}).value || '';
+
+        const setResetPwdStatus = (msg, kind) => {
+          if (!resetPasswordStatus) return;
+          resetPasswordStatus.classList.remove('status-error', 'status-success');
+          if (kind === 'error') resetPasswordStatus.classList.add('status-error');
+          if (kind === 'success') resetPasswordStatus.classList.add('status-success');
+          resetPasswordStatus.textContent = msg || '';
+        };
+
+        if (!p1 || p1.length < 8 || !/[A-Za-z]/.test(p1) || !/\d/.test(p1)) {
+          setResetPwdStatus(document.documentElement.lang === 'zh-CN'
+            ? '新密码至少 8 位，并包含字母和数字。'
+            : 'New password must be at least 8 characters and include letters and numbers.', 'error');
+          return;
+        }
+        if (p1 !== p2) {
+          setResetPwdStatus(document.documentElement.lang === 'zh-CN'
+            ? '两次输入的新密码不一致。'
+            : 'The new passwords do not match.', 'error');
+          return;
+        }
+
+        const code = resetCodeInputs.map((x) => String(x.value || '').trim()).join('');
+        if (!/^\d{6}$/.test(code) || !resetPendingEmail) {
+          setResetPwdStatus(document.documentElement.lang === 'zh-CN'
+            ? '验证码无效，请返回上一步重新输入。'
+            : 'Invalid reset code. Please go back and re-enter the code.', 'error');
+          return;
+        }
+
+        setButtonLoading(submitNewPasswordBtn, true, document.documentElement.lang === 'zh-CN' ? '提交中…' : 'Submitting...');
+        try {
+          const q = new URLSearchParams({
+            email: resetPendingEmail,
+            code,
+            new_password: p1,
+          });
+          const r = await fetch('/api/v1/auth/password/reset/verify-code?' + q.toString(), { method: 'POST' });
+          const raw = await r.text();
+          let j = {};
+          try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = {}; }
+          if (!r.ok) {
+            const d = String((j && j.detail) || '');
+            if (d.includes('password_policy_not_met')) {
+              throw new Error(document.documentElement.lang === 'zh-CN'
+                ? '新密码至少 8 位，并包含字母和数字。'
+                : 'New password must be at least 8 characters and include letters and numbers.');
+            }
+            if (d.includes('invalid_or_expired_reset_code')) {
+              throw new Error(document.documentElement.lang === 'zh-CN'
+                ? '验证码无效或已过期，请重新获取验证码。'
+                : 'Code is invalid or expired. Please request a new code.');
+            }
+            throw new Error(d || ('http_' + r.status));
+          }
+          setResetPwdStatus(document.documentElement.lang === 'zh-CN'
+            ? '密码重置成功，请使用新密码登录。'
+            : 'Password reset successful. Please sign in with your new password.', 'success');
+          resetPendingEmail = '';
+          setTimeout(() => showSigninMode(), 600);
+        } catch (err) {
+          setResetPwdStatus(String((err && err.message) || err || ''), 'error');
+        } finally {
+          setButtonLoading(submitNewPasswordBtn, false);
         }
       });
 
@@ -1056,6 +1249,8 @@
         show('reset-panel', mode==='reset');
         show('create-account-panel', mode==='create');
         show('verify-code-panel', mode==='verify');
+        show('reset-code-panel', mode==='reset_code');
+        show('reset-password-panel', mode==='reset_password');
       }
       async function signin(){
         const email=(el('email-input')?.value||'').trim();
@@ -1095,7 +1290,9 @@
           const q=new URLSearchParams({email});
           const r=await fetch('/api/v1/auth/password/forgot?'+q.toString(),{method:'POST'});
           if(!r.ok) throw new Error('http_'+r.status);
-          if(status) status.textContent=(document.documentElement.lang==='zh-CN'?'如果该邮箱已注册，我们已发送重置方式。':'If this email is registered, we have sent reset instructions.');
+          resetPendingEmail = String(email).toLowerCase();
+          if(status) status.textContent=(document.documentElement.lang==='zh-CN'?'如果该邮箱已注册，我们已发送 6 位重置验证码。':'If this email is registered, we sent a 6-digit reset code.');
+          setPanel('reset_code');
         }catch(e){ if(status) status.textContent=(document.documentElement.lang==='zh-CN'?'发送失败：':'Send failed: ')+String((e&&e.message)||e); }
         finally{ if(btn){ btn.disabled=false; btn.classList.remove('opacity-60','cursor-not-allowed'); } }
       }
@@ -1105,6 +1302,8 @@
         if(t.id==='forgot-password-link'){ ev.preventDefault(); setPanel('reset'); return; }
         if(t.id==='start-trial-link'){ ev.preventDefault(); setPanel('create'); return; }
         if(t.id==='back-to-signin' || t.id==='back-from-create' || t.id==='back-from-verify'){ ev.preventDefault(); setPanel('signin'); return; }
+        if(t.id==='back-from-reset-code'){ ev.preventDefault(); setPanel('reset'); return; }
+        if(t.id==='back-from-reset-password'){ ev.preventDefault(); setPanel('reset_code'); return; }
         if(t.id==='btn-send-reset'){ ev.preventDefault(); forgot(); return; }
       }, true);
       const pt=el('password-toggle'); const pi=el('password-input');
