@@ -1082,33 +1082,59 @@
           if (resetStatus) resetStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '请输入邮箱。' : 'Please enter your email.');
           return;
         }
+
+        // UX: switch panel immediately so users do not wait on network.
+        resetPendingEmail = String(email).trim().toLowerCase();
+        resetCodeInputs.forEach((inp, idx) => { inp.value = ''; if (idx === 0) inp.focus(); });
+        if (resetStatus) {
+          resetStatus.classList.remove('status-error', 'status-success');
+          resetStatus.classList.add('status-success');
+          resetStatus.textContent = document.documentElement.lang === 'zh-CN'
+            ? '验证码发送中…'
+            : 'Sending reset code...';
+        }
+        if (resetCodeStatus) {
+          resetCodeStatus.classList.remove('status-error', 'status-success');
+          resetCodeStatus.textContent = document.documentElement.lang === 'zh-CN'
+            ? '正在发送验证码，请稍候…'
+            : 'Sending code, please wait...';
+        }
+        showResetCodeMode();
+
         try {
-          const q = new URLSearchParams({ email: String(email).trim() });
+          const q = new URLSearchParams({ email: resetPendingEmail });
           const r = await fetch('/api/v1/auth/password/forgot?' + q.toString(), { method: 'POST' });
           const raw = await r.text();
           let j = {};
           try { j = raw ? JSON.parse(raw) : {}; } catch (_) { j = {}; }
           if (!r.ok) throw new Error((j && j.detail) ? j.detail : ('http_' + r.status));
-          resetPendingEmail = String(email).trim().toLowerCase();
-          resetCodeInputs.forEach((inp, idx) => { inp.value = ''; if (idx === 0) inp.focus(); });
+
           if (resetStatus) {
-            resetStatus.classList.remove('status-error', 'status-success');
+            resetStatus.classList.remove('status-error');
             resetStatus.classList.add('status-success');
             resetStatus.textContent = document.documentElement.lang === 'zh-CN'
               ? '如果该邮箱已注册，我们已发送 6 位重置验证码。'
               : 'If this email is registered, we sent a 6-digit reset code.';
           }
           if (resetCodeStatus) {
-            resetCodeStatus.classList.remove('status-error', 'status-success');
-            resetCodeStatus.textContent = '';
+            resetCodeStatus.classList.remove('status-error');
+            resetCodeStatus.classList.add('status-success');
+            resetCodeStatus.textContent = document.documentElement.lang === 'zh-CN'
+              ? '请输入你邮箱中的 6 位验证码。'
+              : 'Enter the 6-digit code from your email.';
           }
-          if (resetPasswordStatus) {
-            resetPasswordStatus.classList.remove('status-error', 'status-success');
-            resetPasswordStatus.textContent = '';
-          }
-          showResetCodeMode();
         } catch (e) {
-          if (resetStatus) resetStatus.textContent = (document.documentElement.lang === 'zh-CN' ? '发送失败：' : 'Send failed: ') + String(e.message || e);
+          const msg = (document.documentElement.lang === 'zh-CN' ? '发送失败：' : 'Send failed: ') + String(e.message || e);
+          if (resetStatus) {
+            resetStatus.classList.remove('status-success');
+            resetStatus.classList.add('status-error');
+            resetStatus.textContent = msg;
+          }
+          if (resetCodeStatus) {
+            resetCodeStatus.classList.remove('status-success');
+            resetCodeStatus.classList.add('status-error');
+            resetCodeStatus.textContent = msg;
+          }
         } finally {
           if (sendResetBtn) { sendResetBtn.disabled = false; sendResetBtn.classList.remove('opacity-60','cursor-not-allowed'); }
         }

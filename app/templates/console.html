@@ -52,6 +52,7 @@
         <div id="account-block" class="border-t border-gray-200 pt-4 space-y-1">
           <div id="account-title" class="menu-label px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Account</div>
                     <button data-title="Settings" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="settings" class="h-4 w-4 text-current"></i></div><span class="menu-label text-sm font-medium">Settings</span></button>
+          <button id="sidebar-lang-toggle" data-title="Language" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="languages" class="h-4 w-4 text-current"></i></div><span id="sidebar-lang-label" class="menu-label text-sm font-medium">Language (EN)</span></button>
           <button data-title="Support" class="menu-option relative flex h-11 w-full items-center rounded-md text-gray-700 hover:bg-gray-50"><div class="grid h-full w-12 place-content-center"><i data-lucide="circle-help" class="h-4 w-4 text-current"></i></div><span class="menu-label text-sm font-medium">Support</span></button>
         </div>
 
@@ -63,17 +64,15 @@
         </a>
       </nav>
 
-      <div id="main-pane" class="flex-1 p-6 overflow-auto text-black">
+      <div id="main-pane" class="flex-1 overflow-auto text-black pt-2 pb-6 px-6">
         <div class="mx-auto w-full max-w-6xl">
-        <div class="flex items-center justify-between mb-8">
+        <div class="h-4"></div>
+        <div class="flex items-center justify-between mb-6">
           <div>
             <h1 id="overview-title" class="text-3xl font-bold text-gray-900">Overview</h1>
             <p id="overview-subtitle" class="text-gray-600 mt-1">Plan status, AI quota, and bookkeeping integration readiness.</p>
           </div>
           <div class="flex justify-end gap-3">
-            <button id="lang-toggle" class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="Switch Language">
-              <span id="lang-toggle-label" class="text-xs font-semibold leading-none">EN</span>
-            </button>
           </div>
         </div>
 
@@ -160,6 +159,8 @@
       const shell = document.getElementById('shell');
       const langToggle = document.getElementById('lang-toggle');
       const langToggleLabel = document.getElementById('lang-toggle-label');
+      const sidebarLangToggle = document.getElementById('sidebar-lang-toggle');
+      const sidebarLangLabel = document.getElementById('sidebar-lang-label');
       const sidebarLogo = document.getElementById('sidebar-logo');
       const signoutLabel = document.getElementById('signout-label');
       const xeroConnectBtn = document.getElementById('xero-connect-btn');
@@ -336,6 +337,7 @@
           'Pricing & Top-up':'套餐与充值',
           'Settings':'设置',
           'Support':'支持',
+          'Language':'语言',
           'Account':'账户',
           'Sign Out':'登出',
           'Overview subtitle':'账户级别、AI额度与记账集成状态',
@@ -364,6 +366,7 @@
           'Pricing & Top-up':'Pricing & Top-up',
           'Settings':'Settings',
           'Support':'Support',
+          'Language':'Language',
           'Account':'Account',
           'Sign Out':'Sign Out',
           'Overview subtitle':'Plan status, AI quota, and bookkeeping integration readiness.',
@@ -394,6 +397,7 @@
         if (accountTitle) accountTitle.textContent = map['Account'];
 
         if (langToggleLabel) langToggleLabel.textContent = zh ? 'EN' : 'CN';
+        if (sidebarLangLabel) sidebarLangLabel.textContent = `${map['Language']} (${zh ? '中文' : 'EN'})`;
         if (signoutLabel) signoutLabel.textContent = map['Sign Out'];
         text('overview-title', map['Overview']);
         text('overview-subtitle', map['Overview subtitle']);
@@ -447,6 +451,13 @@
 
       if (langToggle) {
         langToggle.addEventListener('click', () => {
+          const next = (localStorage.getItem(LANG_KEY) === 'zh') ? 'en' : 'zh';
+          applyLanguage(next);
+          lucide.createIcons();
+        });
+      }
+      if (sidebarLangToggle) {
+        sidebarLangToggle.addEventListener('click', () => {
           const next = (localStorage.getItem(LANG_KEY) === 'zh') ? 'en' : 'zh';
           applyLanguage(next);
           lucide.createIcons();
